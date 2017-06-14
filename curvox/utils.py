@@ -129,3 +129,4 @@ def build_test_from_pc_scaled(pc,
     offset = np.array(center) - np.array(pc_center_in_voxel_grid) * voxel_resolution
 
     return x, voxel_resolution, offset
+    
