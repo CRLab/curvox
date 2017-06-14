@@ -1,7 +1,45 @@
 import numpy as np
+import binvox_rw
+
+PERCENT_PATCH_SIZE = (4.0/5.0)
+PERCENT_X = 0.5
+PERCENT_Y = 0.5
+PERCENT_Z = 0.45
+
+def pcd2binvox(pcd_filepath, binvox_filepath, grid_dim):
+    '''
+    This function takes a pcd filepath, and converts it to
+    a binvox file.  This does not voxeliz the point cloud,
+    it assumes each point can be represented as indices
+    ex cloud:
+    pts = [(0,1,0), (0,10,23), ...]
+    would be converted to a binvox with voxels 
+    (0,1,0) and (0 , 10, 23) occupied
+    '''
+
+    pc = pcl.load(pcd_filepath)
+    pc_arr = pc.to_array().astype(int)
+    pc_mask = (pc_arr[:,0], pc_arr[:,1], pc_arr[:,2])
+
+    out = np.zeros((grid_dim, grid_dim, grid_dim))
+    out[pc_mask] = 1
+    out_int = out.astype(int)
+
+    bv = binvox_rw.Voxels(out_int, out_int.shape, (0,0,0),1, 'xyz')
+    binvox_rw.write(bv, open(binvox_filepath, 'w'))
+
 
 def get_voxel_resolution(pc, patch_size):
-    assert pc.shape[1] == 3
+    '''
+    This function takes in a pointcloud and returns the resolution 
+    of a voxel given that there will be a fixed number of voxels. 
+    For example if patch_size is 40, then we are determining the 
+    side length of a single voxel in meters. 
+    '''
+
+    if not pc.shape[1] == 3:
+        raise Exception("Invalid pointcloud size, should be nx3, but is {}".format(pc.shape))
+
     min_x = pc[:, 0].min()
     min_y = pc[:, 1].min()
     min_z = pc[:, 2].min()

@@ -9,6 +9,9 @@ setup(name="Curvox",
 	  author_email='davidwatkins@cs.columbia.edu',
 	  url='https://github.com/CURG/curvox',
 	  packages=['curvox'],
+	  dependency_links = ['https://github.com/CURG/binvox-rw-py/tarball/master#egg=binvox-rw-1.0'],
 	  install_requires=[
-	  	"numpy >= 1.12.1"
-	  ])
+	  	"numpy >= 1.12.1",
+	  	"binvox-rw >= 1.0"
+	  ]
+	)
