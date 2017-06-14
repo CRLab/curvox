@@ -1,9 +1,10 @@
 import shape_msgs.msg
 import numpy
 from plyfile import PlyData, PlyElement
+import plyfile
 import geometry_msgs.msg
 
-def write_ply_from_mesh_msg(mesh_msg, output_filepath):
+def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
     # vertex = numpy.array([(0, 0, 0),
     #                       (0, 1, 1),
     #                       (1, 0, 1),
@@ -27,7 +28,7 @@ def write_ply_from_mesh_msg(mesh_msg, output_filepath):
     PlyData([vertex_element, face_element], text=True).write(output_filepath)
 
 
-def read_ply_to_mesh_msg(ply_filepath):
+def read_mesh_msg_from_ply_filepath(ply_filepath):
     p = plyfile.PlyData.read(ply_filepath)
     vertices = p.elements[0]
 
