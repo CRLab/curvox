@@ -118,8 +118,6 @@ def build_test_from_pc_scaled(pc,
     voxel_resolution = get_voxel_resolution(pc, patch_size)
 
     pc_center_in_voxel_grid = (patch_size*PERCENT_X, patch_size*PERCENT_Y, patch_size*PERCENT_Z)
-    if OLD_FIT:
-        pc_center_in_voxel_grid = (15, 15, 11)
 
     x = create_voxel_grid_around_point_scaled(
         pc[:, 0:3],
