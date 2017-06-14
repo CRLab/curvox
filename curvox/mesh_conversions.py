@@ -3,6 +3,7 @@ import numpy
 from plyfile import PlyData, PlyElement
 import plyfile
 import geometry_msgs.msg
+import copy
 
 def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
     # vertex = numpy.array([(0, 0, 0),
@@ -49,19 +50,19 @@ def read_mesh_msg_from_ply_filepath(ply_filepath):
 # transform : np.4x4 homogenous transform
 def transform_ply(ply, transform):
     #Translate ply into 4xN array
-    mesh_vertices = np.ones((ply['vertex']['x'].shape[0], 4))
+    mesh_vertices = numpy.ones((4, ply['vertex']['x'].shape[0]))
     mesh_vertices[0, :] = ply['vertex']['x']
     mesh_vertices[1, :] = ply['vertex']['y']
     mesh_vertices[2, :] = ply['vertex']['z']
 
     #Create new 4xN transformed array
-    rotated_mesh = np.dot(transform, mesh_vertices)
+    rotated_mesh = numpy.dot(transform, mesh_vertices)
 
     ply = copy.deepcopy(ply)
 
     #Write transformed vertices back to ply
-    ply['vertex']['x'] = rotated_mesh[:, 0]
-    ply['vertex']['y'] = rotated_mesh[:, 1]
-    ply['vertex']['z'] = rotated_mesh[:, 2]
+    ply['vertex']['x'] = rotated_mesh[0, :]
+    ply['vertex']['y'] = rotated_mesh[1, :]
+    ply['vertex']['z'] = rotated_mesh[2, :]
 
     return ply
