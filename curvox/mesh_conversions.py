@@ -4,6 +4,7 @@ from plyfile import PlyData, PlyElement
 import plyfile
 import geometry_msgs.msg
 import copy
+import pcl
 
 def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
     # vertex = numpy.array([(0, 0, 0),
@@ -66,3 +67,11 @@ def transform_ply(ply, transform):
     ply['vertex']['z'] = rotated_mesh[2, :]
 
     return ply
+
+
+def merge_pcd_files(out_filename, *pcd_filenames):
+
+    pcd_objs = map(pcl.load, pcd_filenames)
+    pcd_arrs = map(lambda x: x.to_array(), pcd_objs)
+    total_pcd_arr = numpy.concatenate(pcd_arrs, axis=0)
+    pcl.save(pcl.PointCloud(total_pcd_arr), out_filename)
