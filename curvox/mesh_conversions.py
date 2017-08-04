@@ -1,6 +1,5 @@
 import shape_msgs.msg
 import numpy
-from plyfile import PlyData, PlyElement
 import plyfile
 import geometry_msgs.msg
 import copy
@@ -67,7 +66,6 @@ def transform_ply(ply, transform):
     ply['vertex']['z'] = rotated_mesh[2, :]
 
     return ply
-
 
 def merge_pcd_files(out_filename, *pcd_filenames):
 
