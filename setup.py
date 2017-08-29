@@ -2,7 +2,7 @@
 
 from distutils.core import setup
 
-setup(name="Curvox",
+setup(name="curvox",
       version='1.0',
       description='Python library for creating and initializing point clouds from voxel grids',
       author='David Watkins',
