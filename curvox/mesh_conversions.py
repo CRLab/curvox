@@ -5,7 +5,12 @@ import geometry_msgs.msg
 import copy
 import pcl
 
-def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
+
+def mesh_msg_to_ply(mesh_msg):
+    """
+    :type mesh_msg: geometry_msgs.msg.mesh
+    """
+
     # vertex = numpy.array([(0, 0, 0),
     #                       (0, 1, 1),
     #                       (1, 0, 1),
@@ -23,32 +28,55 @@ def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
     vertices_np = numpy.array(vertices, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
     faces_np = numpy.array(faces, dtype=[('vertex_indices', 'i4', (3,))])
 
-    vertex_element = PlyElement.describe(vertices_np, 'vertex')
-    face_element = PlyElement.describe(faces_np, 'face')
+    vertex_element = plyfile.PlyElement.describe(vertices_np, 'vertex')
+    face_element = plyfile.PlyElement.describe(faces_np, 'face')
 
-    PlyData([vertex_element, face_element], text=True).write(output_filepath)
+    return plyfile.PlyData([vertex_element, face_element], text=True)
 
 
-def read_mesh_msg_from_ply_filepath(ply_filepath):
-    p = plyfile.PlyData.read(ply_filepath)
-    vertices = p.elements[0]
+def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
+    """
+    :type mesh_msg: geometry_msgs.msg.mesh
+    :type output_filepath: str
+    """
+    mesh_msg_to_ply(mesh_msg).write(output_filepath)
 
-    # Build up a ROS shape_msgs.msg.Mesh so that it can be returned to the client
+
+def ply_to_mesh_msg(ply):
+    """
+    :type ply: plyfile.PlyData
+    """
+
     mesh_msg = shape_msgs.msg.Mesh()
+
+    vertices = ply.elements[0]
     for i in range(vertices.data.shape[0]):
         point = geometry_msgs.msg.Point(vertices.data[i]['x'], vertices.data[i]['y'], vertices.data[i]['z'])
         mesh_msg.vertices.append(point)
-        
-    triangles = p.elements[1]
+
+    triangles = ply.elements[1]
     for i in range(triangles.data.shape[0]):
         t = shape_msgs.msg.MeshTriangle(*triangles.data[i])
         mesh_msg.triangles.append(t)
 
     return mesh_msg
 
-# ply : The result of plyfile.read
-# transform : np.4x4 homogenous transform
+
+def read_mesh_msg_from_ply_filepath(ply_filepath):
+    """
+    :type ply_filepath: str
+    """
+
+    ply = plyfile.PlyData.read(ply_filepath)
+    return ply_to_mesh_msg(ply)
+
+
 def transform_ply(ply, transform):
+    """
+    :type ply: plyfile.PlyData
+    :type transform: numpy.ndarray
+    :param transform: A 4x4 homogenous transform to apply to the ply mesh
+    """
     #Translate ply into 4xN array
     mesh_vertices = numpy.ones((4, ply['vertex']['x'].shape[0]))
     mesh_vertices[0, :] = ply['vertex']['x']
@@ -66,6 +94,7 @@ def transform_ply(ply, transform):
     ply['vertex']['z'] = rotated_mesh[2, :]
 
     return ply
+
 
 def merge_pcd_files(out_filename, *pcd_filenames):
 
