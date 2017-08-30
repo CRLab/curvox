@@ -1,6 +1,8 @@
 import pcl
 import numpy as np
-
+import sensor_msgs.point_cloud2 as pcl2
+import std_msgs
+import rospy
 
 def pcd_to_np(pcd_filename):
     """
@@ -25,9 +27,38 @@ def np_to_pcl(pc_np):
     :type pc_np: numpy.ndarray
     """
     # Convert nx3 numpy array to PCL pointcloud
-    new_pcd = pcl.PointCloud()
-    new_pcd.from_array(pc_np)
+    new_pcd = pcl.PointCloud(np.array(pc_np, np.float32))
     return new_pcd
+
+
+def cloud_msg_to_np(msg):
+    """
+    :type msg: sensor_msg.msg.PointCloud2
+    """
+
+    num_pts = msg.width*msg.height
+    out = np.zeros((num_pts, 3))
+    count = 0
+    for point in pcl2.read_points(msg, skip_nans=True):
+        out[count] = point
+        count += 1
+
+    # if there were nans, we need to resize cloud to skip them.
+    out = out[:count]
+    return out
+
+
+def np_to_cloud_msg(pc_np, frame_id):
+    """
+    :type pc_np: numpy.ndarray
+    :param pc_np: A nx3 pointcloud
+    """
+    header = std_msgs.msg.Header()
+    header.stamp = rospy.Time.now()
+    header.frame_id = frame_id
+    cloud_msg = pcl2.create_cloud_xyz32(header, pc_np)
+
+    return cloud_msg
 
 
 def transform_cloud(pc, transform):

@@ -84,16 +84,16 @@ def transform_ply(ply, transform):
     mesh_vertices[2, :] = ply['vertex']['z']
 
     #Create new 4xN transformed array
-    rotated_mesh = numpy.dot(transform, mesh_vertices)
+    transformed_mesh = numpy.dot(transform, mesh_vertices)
 
-    ply = copy.deepcopy(ply)
+    transformed_ply = copy.deepcopy(ply)
 
     #Write transformed vertices back to ply
-    ply['vertex']['x'] = rotated_mesh[0, :]
-    ply['vertex']['y'] = rotated_mesh[1, :]
-    ply['vertex']['z'] = rotated_mesh[2, :]
+    transformed_ply['vertex']['x'] = transformed_mesh[0, :]
+    transformed_ply['vertex']['y'] = transformed_mesh[1, :]
+    transformed_ply['vertex']['z'] = transformed_mesh[2, :]
 
-    return ply
+    return transformed_ply
 
 
 def merge_pcd_files(out_filename, *pcd_filenames):
