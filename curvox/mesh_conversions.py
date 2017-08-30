@@ -8,7 +8,7 @@ import pcl
 
 def mesh_msg_to_ply(mesh_msg):
     """
-    :type mesh_msg: geometry_msgs.msg.mesh
+    :type mesh_msg: shape_msgs.msg.Mesh
     """
 
     # vertex = numpy.array([(0, 0, 0),
@@ -36,7 +36,7 @@ def mesh_msg_to_ply(mesh_msg):
 
 def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
     """
-    :type mesh_msg: geometry_msgs.msg.mesh
+    :type mesh_msg: shape_msgs.msg.Mesh
     :type output_filepath: str
     """
     mesh_msg_to_ply(mesh_msg).write(output_filepath)
