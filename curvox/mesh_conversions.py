@@ -52,14 +52,10 @@ def ply_to_mesh_msg(ply):
     mesh_msg = shape_msgs.msg.Mesh()
 
     vertices = ply.elements[0]
-    for i in range(vertices.data.shape[0]):
-        point = geometry_msgs.msg.Point(vertices.data[i]['x'], vertices.data[i]['y'], vertices.data[i]['z'])
-        mesh_msg.vertices.append(point)
+    mesh_msg.vertices = [geometry_msgs.msg.Point(vertex['x'], vertex['y'], vertex['z']) for vertex in vertices.data]
 
     triangles = ply.elements[1]
-    for i in range(triangles.data.shape[0]):
-        t = shape_msgs.msg.MeshTriangle(*triangles.data[i])
-        mesh_msg.triangles.append(t)
+    mesh_msg.triangles = [shape_msgs.msg.MeshTriangle(*triangle) for triangle in triangles.data]
 
     return mesh_msg
 
