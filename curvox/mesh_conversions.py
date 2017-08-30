@@ -9,6 +9,7 @@ import pcl
 def mesh_msg_to_ply(mesh_msg):
     """
     :type mesh_msg: shape_msgs.msg.Mesh
+    :rtype plyfile.PlyData
     """
 
     # vertex = numpy.array([(0, 0, 0),
@@ -45,6 +46,7 @@ def write_mesh_msg_to_ply_filepath(mesh_msg, output_filepath):
 def ply_to_mesh_msg(ply):
     """
     :type ply: plyfile.PlyData
+    :rtype shape_msgs.msg.Mesh
     """
 
     mesh_msg = shape_msgs.msg.Mesh()
@@ -65,6 +67,7 @@ def ply_to_mesh_msg(ply):
 def read_mesh_msg_from_ply_filepath(ply_filepath):
     """
     :type ply_filepath: str
+    :rtype shape_msgs.msg.Mesh
     """
 
     ply = plyfile.PlyData.read(ply_filepath)
@@ -76,7 +79,9 @@ def transform_ply(ply, transform):
     :type ply: plyfile.PlyData
     :type transform: numpy.ndarray
     :param transform: A 4x4 homogenous transform to apply to the ply mesh
+    :rtype plyfile.PlyData
     """
+
     #Translate ply into 4xN array
     mesh_vertices = numpy.ones((4, ply['vertex']['x'].shape[0]))
     mesh_vertices[0, :] = ply['vertex']['x']

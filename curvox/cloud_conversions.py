@@ -4,10 +4,13 @@ import sensor_msgs.point_cloud2 as pcl2
 import std_msgs
 import rospy
 
+
 def pcd_to_np(pcd_filename):
     """
     :type pcd_filename: str
+    :rtype numpy.ndarray
     """
+
     # Read in PCD then return nx3 numpy array
     pcd = pcl.load(pcd_filename)
     return pcl_to_np(pcd)
@@ -16,7 +19,9 @@ def pcd_to_np(pcd_filename):
 def pcl_to_np(pointcloud):
     """
     :type pointcloud: pcl.PointCloud
+    :rtype numpy.ndarray
     """
+
     # Convert PCL pointcloud to numpy nx3 numpy array
     pc_nx3 = pointcloud.to_array()
     return pc_nx3
@@ -25,7 +30,9 @@ def pcl_to_np(pointcloud):
 def np_to_pcl(pc_np):
     """
     :type pc_np: numpy.ndarray
+    :rtype pcl.PointCloud
     """
+
     # Convert nx3 numpy array to PCL pointcloud
     new_pcd = pcl.PointCloud(np.array(pc_np, np.float32))
     return new_pcd
@@ -34,6 +41,7 @@ def np_to_pcl(pc_np):
 def cloud_msg_to_np(msg):
     """
     :type msg: sensor_msg.msg.PointCloud2
+    :rtype numpy.ndarray
     """
 
     num_pts = msg.width*msg.height
@@ -52,7 +60,9 @@ def np_to_cloud_msg(pc_np, frame_id):
     """
     :type pc_np: numpy.ndarray
     :param pc_np: A nx3 pointcloud
+    :rtype sensor_msg.msg.PointCloud2
     """
+
     header = std_msgs.msg.Header()
     header.stamp = rospy.Time.now()
     header.frame_id = frame_id
@@ -63,10 +73,11 @@ def np_to_cloud_msg(pc_np, frame_id):
 
 def transform_cloud(pc, transform):
     """
-    :type pc: np.ndarray
+    :type pc: numpy.ndarray
     :type transform: numpy.ndarray
     :param transform: A 4x4 homogenous transform to apply to the cloud
     :param pc: A nx3 pointcloud
+    :rtype numpy.ndarray
     """
 
     if len(pc.shape) != 2:
