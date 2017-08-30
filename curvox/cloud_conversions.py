@@ -7,39 +7,45 @@ import rospy
 
 def pcd_to_np(pcd_filename):
     """
+    Read in PCD then return nx3 numpy array
+
     :type pcd_filename: str
     :rtype numpy.ndarray
     """
 
-    # Read in PCD then return nx3 numpy array
     pcd = pcl.load(pcd_filename)
     return pcl_to_np(pcd)
 
 
 def pcl_to_np(pointcloud):
     """
+    Convert PCL pointcloud to numpy nx3 numpy array
+
     :type pointcloud: pcl.PointCloud
     :rtype numpy.ndarray
     """
 
-    # Convert PCL pointcloud to numpy nx3 numpy array
     pc_nx3 = pointcloud.to_array()
     return pc_nx3
 
 
 def np_to_pcl(pc_np):
     """
+    Convert nx3 numpy array to PCL pointcloud
+
     :type pc_np: numpy.ndarray
     :rtype pcl.PointCloud
     """
 
-    # Convert nx3 numpy array to PCL pointcloud
     new_pcd = pcl.PointCloud(np.array(pc_np, np.float32))
     return new_pcd
 
 
 def cloud_msg_to_np(msg):
     """
+    Take a ros pointclud message and convert it to
+    an nx3 numpy ndarray.
+
     :type msg: sensor_msg.msg.PointCloud2
     :rtype numpy.ndarray
     """
