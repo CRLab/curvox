@@ -95,8 +95,7 @@ def voxelize_points(points, pc_bbox_center, voxel_resolution, num_voxels_per_dim
     # this is the voxel grid we are going to return
     voxel_grid = np.zeros((num_voxels_per_dim,
                            num_voxels_per_dim,
-                           num_voxels_per_dim,
-                           1), dtype=np.bool)
+                           num_voxels_per_dim), dtype=np.bool)
 
     # take the points and convert them from meters to voxel space coords
     centered_scaled_points = np.floor(
@@ -127,8 +126,7 @@ def voxelize_points(points, pc_bbox_center, voxel_resolution, num_voxels_per_dim
     csp_int = centered_scaled_points.astype(int)
 
     # create a mask from our set of points.
-    mask = (csp_int[:, 0], csp_int[:, 1], csp_int[:, 2],
-            np.zeros((csp_int.shape[0]), dtype=int))
+    mask = (csp_int[:, 0], csp_int[:, 1], csp_int[:, 2])
 
     # apply the mask to our voxel grid setting voxel that had points in them to be occupied
     voxel_grid[mask] = 1
