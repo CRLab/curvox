@@ -51,14 +51,14 @@ def cloud_msg_to_np(msg):
     """
 
     num_pts = msg.width*msg.height
-    out = np.zeros((num_pts, 3))
+    out = np.zeros((num_pts, 4))
     count = 0
     for point in pcl2.read_points(msg, skip_nans=True):
         out[count] = point
         count += 1
 
     # if there were nans, we need to resize cloud to skip them.
-    out = out[:count]
+    out = out[:count, 0:3]
     return out
 
 
