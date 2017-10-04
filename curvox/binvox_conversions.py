@@ -20,6 +20,6 @@ def binvox_to_pcl(vox):
     pts_offset = pts * single_voxel_dim
     
     # translate the points back to their original position
-    pts = pts_offset - vox.translate
+    pts = pts_offset + vox.translate
 
-    return pts_offset
+    return pts
