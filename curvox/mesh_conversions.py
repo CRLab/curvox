@@ -95,11 +95,3 @@ def transform_ply(ply, transform):
     transformed_ply['vertex']['z'] = transformed_mesh[2, :]
 
     return transformed_ply
-
-
-def merge_pcd_files(out_filename, *pcd_filenames):
-
-    pcd_objs = map(pcl.load, pcd_filenames)
-    pcd_arrs = map(lambda x: x.to_array(), pcd_objs)
-    total_pcd_arr = numpy.concatenate(pcd_arrs, axis=0)
-    pcl.save(pcl.PointCloud(total_pcd_arr), out_filename)
