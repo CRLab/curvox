@@ -53,7 +53,7 @@ def cloud_msg_to_np(msg):
     num_pts = msg.width*msg.height
     out = np.zeros((num_pts, 4))
     count = 0
-    for point in pcl2.read_points(msg):
+    for point in pcl2.read_points(msg, skip_nans=False):
         out[count] = point
         count += 1
 
