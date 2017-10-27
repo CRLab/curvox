@@ -3,7 +3,6 @@ import numpy
 import plyfile
 import geometry_msgs.msg
 import copy
-import pcl
 
 
 def mesh_msg_to_ply(mesh_msg):
