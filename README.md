@@ -5,4 +5,4 @@ mesh_conversions.py has utilities for converting meshes between ply objects, and
 
 cloud_conversions.py has utilities for converting pointclouds between numpy arrays, pointcloud objects, and ros messages
 
-utils.py is for generating binvox files from pointclouds.
+pc_vox_utils.py is for generating binvox files from pointclouds.
