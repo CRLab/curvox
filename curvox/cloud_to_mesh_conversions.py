@@ -9,7 +9,9 @@ from pyhull.convex_hull import ConvexHull
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.tri as mtri
+from curvox import pc_vox_utils, binvox_conversions
 import GPy as gpy
+import binvox_rw
 
 
 def _plot_triangles(points, tri):
@@ -277,18 +279,14 @@ def _gaussian_process_pointcloud_completion(cloud, patch_size, percent_x, percen
     gp.optimize()
 
     # Create voxel grid to use for gaussian process
-    center_point = get_pointcloud_center(points)
+    center_point = pc_vox_utils.get_bbox_center(points)
     voxel_resolution = get_voxel_resolution(points, patch_size, percent_patch_size)
 
     # Where am I putting my point cloud relative to the center of my voxel grid
     # ex. (20, 20, 20) or (20, 20, 18)
     pc_center_in_voxel_grid = (patch_size * percent_x, patch_size * percent_y, patch_size * percent_z)
 
-    voxel_grid = create_voxel_grid_around_point_scaled(points,
-                                                       center_point,
-                                                       voxel_resolution,
-                                                       patch_size,
-                                                       pc_center_in_voxel_grid)
+    voxel_grid = pc_vox_utils.voxelize_points(points, center_point, voxel_resolution, patch_size, pc_center_in_voxel_grid)
 
     # Generate query points
     xs = numpy.arange(center_point[0] - 0.5 * voxel_resolution * patch_size,
@@ -360,16 +358,12 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, tactile_c
     depth_points = depth_cloud.to_array()
     tactile_points = tactile_cloud.to_array()
 
-    # Generate gaussian process
-    kernel_hyps = [0.1, 0.3]
-    meas_variance = 0.1
-    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_hyps[0], lengthscale=kernel_hyps[1])
 
     # Copy depth points
     points_positive = numpy.copy(depth_points)
-    points_positive[:, 2] += 0.01
+    # points_positive[:, 2] += 0.01
     points_negative = numpy.copy(depth_points)
-    # points_negative[:, 2] -= 0.01
+    points_negative[:, 2] -= 0.005
     depth_points = numpy.concatenate([points_negative, points_positive], axis=0)
     sdf_meas_depth = numpy.ones((depth_points.shape[0], 1))
     for i in range(depth_points.shape[0]/2):
@@ -380,9 +374,9 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, tactile_c
 
     # Copy tactile points
     points_positive = numpy.copy(tactile_points)
-    points_positive[:, 2] += 0.01
+    # points_positive[:, 2] += 0.01
     points_negative = numpy.copy(tactile_points)
-    # points_negative[:, 2] -= 0.01
+    points_negative[:, 2] -= 0.005
     tactile_points = numpy.concatenate([points_positive, points_negative], axis=0)
     sdf_meas_tactile = numpy.ones((tactile_points.shape[0], 1))
     for i in range(tactile_points.shape[0]/2):
@@ -394,24 +388,38 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, tactile_c
     points = numpy.concatenate([depth_points, tactile_points], axis=0)
     sdf_meas = numpy.concatenate([sdf_meas_depth, sdf_meas_tactile], axis=0)
 
-    # plot_sdf_meas(points, sdf_meas)
-
-    gp = gpy.models.GPRegression(points, sdf_meas, kernel)
-    gp.optimize()
+    # Generate gaussian process
+    kernel_hyps = [0.01]
+    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_hyps[0], useGPU=True)
 
     # Create voxel grid to use for gaussian process
-    center_point = get_pointcloud_center(points)
+    center_point = pc_vox_utils.get_bbox_center(points)
     voxel_resolution = get_voxel_resolution(points, patch_size, percent_patch_size)
 
     # Where am I putting my point cloud relative to the center of my voxel grid
     # ex. (20, 20, 20) or (20, 20, 18)
     pc_center_in_voxel_grid = (patch_size * percent_x, patch_size * percent_y, patch_size * percent_z)
 
-    voxel_grid = create_voxel_grid_around_point_scaled(points,
-                                                       center_point,
-                                                       voxel_resolution,
-                                                       patch_size,
-                                                       pc_center_in_voxel_grid)
+    voxel_grid = pc_vox_utils.voxelize_points(points, center_point, voxel_resolution, patch_size,
+                                              pc_center_in_voxel_grid)
+
+    ternary_voxel_grid = pc_vox_utils.get_ternary_voxel_grid(voxel_grid)
+    unoccupied_voxels = numpy.zeros(voxel_grid.shape)
+    unoccupied_voxels[ternary_voxel_grid == 0] = 1
+
+    # Get indices of every point marked as empty
+    offset = numpy.array(center_point) - numpy.array(pc_center_in_voxel_grid) * voxel_resolution
+    vox = binvox_rw.Voxels(unoccupied_voxels, unoccupied_voxels.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
+    unoccupied_points = binvox_conversions.binvox_to_pcl(vox)
+    unoccupied_points = unoccupied_points[0:unoccupied_points.size:10]
+
+    sdf_meas_unoccupied_points = numpy.zeros((unoccupied_points.shape[0], 1))
+
+    points = numpy.concatenate([points, unoccupied_points], axis=0)
+    sdf_meas = numpy.concatenate([sdf_meas, sdf_meas_unoccupied_points], axis=0)
+
+    gp = gpy.models.GPRegression(points, sdf_meas, kernel, noise_var=0.005)
+    gp.optimize()
 
     # Generate query points
     xs = numpy.arange(center_point[0] - 0.5 * voxel_resolution * patch_size,
@@ -440,6 +448,12 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, tactile_c
     vertices, faces = mcubes.marching_cubes(output_grid[:, :, :], 0.5)
     vertices = rescale_mesh(vertices, center_point, voxel_resolution, pc_center_in_voxel_grid)
 
+    data = _generate_ply_data(vertices, faces)
+    data.write(open("tmp.ply", 'wb'))
+
+    import IPython
+    IPython.embed()
+
     # Export to plyfile type
     return _generate_ply_data(vertices, faces)
 
@@ -463,9 +477,9 @@ def gaussian_process_depth_tactile_completion(depth_pcd_filenames, tactile_pcd_f
 
 
 if __name__ == "__main__":
-    fast_triangulation("/home/david/Downloads/bun0.pcd", suffix="_triangulation")
-    qhull_completion("/home/david/Downloads/bun0.pcd", suffix="_qhull")
-    partial_completion("/home/david/Downloads/bun0.pcd", suffix="_partial", patch_size=40)
+    # fast_triangulation("/home/david/Downloads/bun0.pcd", suffix="_triangulation")
+    # qhull_completion("/home/david/Downloads/bun0.pcd", suffix="_qhull")
+    # partial_completion("/home/david/Downloads/bun0.pcd", suffix="_partial", patch_size=40)
     # gaussian_process_general_completion("/home/david/Downloads/pringles_original_2_y17_m10_d30_h13_m53_s20/out.pcd", suffix="_gaussian", patch_size=20)
     gaussian_process_depth_tactile_completion(
         ["/home/david/Downloads/pringles_original_2_y17_m10_d30_h13_m53_s20/out.pcd"],

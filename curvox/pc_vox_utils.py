@@ -190,3 +190,40 @@ def pc_to_binvox_for_shape_completion(points,
     # create a voxel grid object to contain the grid, shape, offset in the world, and grid resolution
     vox = binvox_rw.Voxels(vox_np, vox_np.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
     return vox
+
+
+def get_ternary_voxel_grid(binary_voxel_grid):
+    """
+    Takes a binary occupancy voxel grid for the surface of the object and
+    returns a ternary occupancy voxel grid.
+    :param binary_voxel_grid: a voxel grid that indicates whether a voxel is
+    occupied by the visible surface ("1") or not occupied by the visible
+    surface ("0"). If you're seeing a box, the "1"s would represent the location
+    of the part of the box's surface that you can see, while the "0" would
+    represent everything else.
+    :param method: Can be 'simple' or 'projection'.
+    :return: a voxel grid that indicates whether a voxel is visually occluded
+    ("2"), occupied by the visible surface ("1"), or visibly known to be
+    unoccupied ("0").
+    """
+
+    assert len(binary_voxel_grid.shape) == 3
+
+    voxel_grid_shape = binary_voxel_grid.shape
+    # Initialize all ternary grid values to 0.
+    ternary_voxel_grid = np.zeros(voxel_grid_shape)
+    # The 'simple' method assumes that the camera is an infinite distance
+    # away from the object and thus considers as occluded every z value
+    # behind the surface for a fixed x and y. Perspective isn't taken into
+    # account.
+
+    for i in range(voxel_grid_shape[0]):
+        for j in range(voxel_grid_shape[1]):
+            for k in range(voxel_grid_shape[2]):
+                if binary_voxel_grid[i, j, k] > 0:
+                    # Surface found. set surface to 1 in the ternary_voxel
+                    # grid, and everything behind it to 2.
+                    ternary_voxel_grid[i, j, k] = 1
+                    ternary_voxel_grid[i, j, k + 1:voxel_grid_shape[2]] = 2
+                    break
+    return ternary_voxel_grid

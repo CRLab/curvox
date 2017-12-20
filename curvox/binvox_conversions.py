@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def binvox_to_pcl(vox):
     """
     Takines a binvox_rw.binvox_rw.Voxels, and converts it to a nx3 numpy array
