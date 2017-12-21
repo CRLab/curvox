@@ -134,62 +134,75 @@ def voxelize_points(points, pc_bbox_center, voxel_resolution, num_voxels_per_dim
     return voxel_grid
 
 
-def pc_to_binvox_for_shape_completion(points,
-                                      patch_size):
+def pc_to_binvox(points, **kwargs):
     """
-    This function creates a binvox object from a pointcloud.  The voxel grid is slightly off center from the
+    This function creates a binvox object from a pointcloud. The voxel grid is slightly off center from the
     pointcloud bbox center so that the back of the grid has more room for the completion.
 
     :type points: numpy.ndarray
     :param points: nx3 numpy array representing a pointcloud
 
-    :type patch_size: int
-    :param patch_size: how many voxels along a single dimension of the voxel grid.
-    Ex: patch_size=40 gives us a 40^3 voxel grid
-
     :rtype: binvox_rw.Voxels
 
+    :param kwargs:
+        See below
+
+    :Keyword Arguments:
+        * *patch_size* (``int``) --
+            how many voxels along a single dimension of the voxel grid.
+            Ex: patch_size=40 gives us a 40^3 voxel grid
+            Defaults to 40
+        * *percent_patch_size* (``float``) --
+            how much of the voxel grid do we want our pointcloud to fill.
+            make this < 1 so that there is some padding on the edges
+            Defaults to 0.8
+        * *percent_offset* (``tuple``) --
+            Where should the center of the points be placed inside the voxel grid.
+            normally make PERCENT_Z < 0.5 so that the points are placed towards the front of the grid
+            this leaves more room for the shape completion to fill in the occluded back half of the occupancy grid.
     """
+    patch_size = kwargs.get("patch_size", 40)
+    percent_offset = kwargs.get("percent_offset", (0.5, 0.5, 0.45))
+    percent_patch_size = kwargs.get("percent_patch_size", 0.8)
 
     if points.shape[1] != 3:
         raise Exception("Invalid pointcloud size, should be nx3, but is {}".format(points.shape))
 
-    # how much of the voxel grid do we want our pointcloud to fill.
-    # make this < 1 so that there is some padding on the edges
-    PERCENT_PATCH_SIZE = (4.0/5.0)
+    if len(percent_offset) != 3:
+        raise Exception("Percent offset should be a tuple of size 3, instead got {}".format(percent_offset))
 
-    # Where should the center of the points be placed inside the voxel grid.
-    # normally make PERCENT_Z < 0.5 so that the points are placed towards the front of the grid
-    # this leaves more room for the shape completion to fill in the occluded back half of the occupancy grid.
-    PERCENT_X = 0.5
-    PERCENT_Y = 0.5
-    PERCENT_Z = 0.45
+    percent_x, percent_y, percent_z = percent_offset
 
     # get the center of the pointcloud in meters. Ex: center = np.array([0.2, 0.1, 2.0])
-    center = get_bbox_center(points)
+    voxel_center = get_bbox_center(points)
 
     # get the size of an individual voxel. Ex: voxel_resolution=0.01 meaning 1cm^3 voxel
     # PERCENT_PATCH_SIZE determines how much extra padding to leave on the sides
-    voxel_resolution = get_voxel_resolution(points, PERCENT_PATCH_SIZE * patch_size)
+    voxel_resolution = get_voxel_resolution(points, percent_patch_size * patch_size)
 
     # this tuple is where we want to stick the center of the pointcloud in our voxel grid
     # Ex: (20, 20, 18) leaving some extra room in the back half.
-    pc_center_in_voxel_grid = (patch_size*PERCENT_X, patch_size*PERCENT_Y, patch_size*PERCENT_Z)
+    pc_center_in_voxel_grid = (patch_size*percent_x, patch_size*percent_y, patch_size*percent_z)
 
     # create a voxel grid.
     vox_np = voxelize_points(
         points=points[:, 0:3],
-        pc_bbox_center=center,
+        pc_bbox_center=voxel_center,
         voxel_resolution=voxel_resolution,
         num_voxels_per_dim=patch_size,
         pc_center_in_voxel_grid=pc_center_in_voxel_grid)
 
     # location in meters of the bottom corner of the voxel grid in world space
-    offset = np.array(center) - np.array(pc_center_in_voxel_grid) * voxel_resolution
+    offset = np.array(voxel_center) - np.array(pc_center_in_voxel_grid) * voxel_resolution
 
     # create a voxel grid object to contain the grid, shape, offset in the world, and grid resolution
-    vox = binvox_rw.Voxels(vox_np, vox_np.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
-    return vox
+    voxel_grid = binvox_rw.Voxels(vox_np, vox_np.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
+
+    # Where am I putting my point cloud relative to the center of my voxel grid
+    # ex. (20, 20, 20) or (20, 20, 18)
+    center_point_in_voxel_grid = (patch_size * percent_x, patch_size * percent_y, patch_size * percent_z)
+
+    return voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid
 
 
 def get_ternary_voxel_grid(binary_voxel_grid):
@@ -227,3 +240,42 @@ def get_ternary_voxel_grid(binary_voxel_grid):
                     ternary_voxel_grid[i, j, k + 1:voxel_grid_shape[2]] = 2
                     break
     return ternary_voxel_grid
+
+
+def rescale_mesh(vertices, patch_center, voxel_resolution, pc_center_in_voxel_grid):
+    return vertices * voxel_resolution - np.array(pc_center_in_voxel_grid) * voxel_resolution + np.array(patch_center)
+
+
+def create_voxel_grid_around_point_scaled(
+        points,
+        patch_center,
+        voxel_resolution,
+        num_voxels_per_dim,
+        pc_center_in_voxel_grid
+):
+    voxel_grid = np.zeros((num_voxels_per_dim, num_voxels_per_dim, num_voxels_per_dim, 1), dtype=np.float32)
+
+    centered_scaled_points = np.floor(
+        (points - np.array(patch_center) + np.array(
+            pc_center_in_voxel_grid) * voxel_resolution) / voxel_resolution)
+
+    mask = centered_scaled_points.max(axis=1) < num_voxels_per_dim
+    centered_scaled_points = centered_scaled_points[mask]
+
+    if centered_scaled_points.shape[0] == 0:
+        return voxel_grid
+
+    mask = centered_scaled_points.min(axis=1) > 0
+    centered_scaled_points = centered_scaled_points[mask]
+
+    if centered_scaled_points.shape[0] == 0:
+        return voxel_grid
+
+    csp_int = centered_scaled_points.astype(int)
+
+    mask = (csp_int[:, 0], csp_int[:, 1], csp_int[:, 2],
+            np.zeros((csp_int.shape[0]), dtype=int))
+
+    voxel_grid[mask] = 1
+
+    return voxel_grid
