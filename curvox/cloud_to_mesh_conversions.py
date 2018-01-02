@@ -437,17 +437,3 @@ def gaussian_process_depth_tactile_completion(depth_pcd_filenames, tactile_pcd_f
 
 COMPLETION_METHODS = [delaunay_completion, marching_cubes_completion, qhull_completion, gaussian_process_completion]
 TACTILE_COMPLETION_METHODS = []
-
-
-if __name__ == "__main__":
-    # fast_triangulation("/home/david/Downloads/bun0.pcd", suffix="_triangulation")
-    # qhull_completion("/home/david/Downloads/bun0.pcd", suffix="_qhull")
-    # partial_completion("/home/david/Downloads/bun0.pcd", suffix="_partial", patch_size=40)
-    # gaussian_process_general_completion("/home/david/Downloads/pringles_original_2_y17_m10_d30_h13_m53_s20/out.pcd", suffix="_gaussian", patch_size=20)
-    gaussian_process_depth_tactile_completion(
-        ["/home/david/Downloads/pringles_original_2_y17_m10_d30_h13_m53_s20/out.pcd"],
-        ["/home/david/Downloads/pringles_original_2_y17_m10_d30_h13_m53_s20/tactile_cf.pcd"],
-        suffix="_gaussian",
-        patch_size=20,
-        percent_z=0.5
-    )

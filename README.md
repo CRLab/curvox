@@ -10,5 +10,12 @@ pc_vox_utils.py is for generating binvox files from pointclouds.
 
 ## Install
 ```bash
-pip2 install -e . --user --process-dependency-links
+$ pip2 install -e . --user --process-dependency-links
+```
+
+## Tests
+A few tests have been written in the `tests` folder. In order to run the test suite
+```bash
+$ cd tests
+$ py.test
 ```
