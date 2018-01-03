@@ -1,7 +1,9 @@
 import numpy as np
 import binvox_rw
+import numba
 
 
+@numba.jit
 def get_voxel_resolution(pc, patch_size):
     """
     This function takes in a pointcloud and returns the resolution 
@@ -9,7 +11,7 @@ def get_voxel_resolution(pc, patch_size):
     For example if patch_size is 40, then we are determining the 
     side length of a single voxel in meters. Sovoxel_resolution
     may end up being something like 0.01 for a 1cm^3 voxel size
-
+jaccard_distance
     :type pc: numpy.ndarray
     :param pc: nx3 numpy array representing a pointcloud
 
@@ -39,6 +41,7 @@ def get_voxel_resolution(pc, patch_size):
     return voxel_resolution
 
 
+@numba.jit
 def get_bbox_center(pc):
     """
     This function takes an nx3 pointcloud and returns a tuple
@@ -67,6 +70,7 @@ def get_bbox_center(pc):
     return center
 
 
+@numba.jit
 def voxelize_points(points, pc_bbox_center, voxel_resolution, num_voxels_per_dim, pc_center_in_voxel_grid):
 
     """
@@ -205,6 +209,7 @@ def pc_to_binvox(points, **kwargs):
     return voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid
 
 
+@numba.jit
 def get_ternary_voxel_grid(binary_voxel_grid):
     """
     Takes a binary occupancy voxel grid for the surface of the object and
@@ -220,9 +225,16 @@ def get_ternary_voxel_grid(binary_voxel_grid):
     unoccupied ("0").
     """
 
-    assert len(binary_voxel_grid.shape) == 3
+    if isinstance(binary_voxel_grid, binvox_rw.Voxels):
+        binary_voxel_grid = binary_voxel_grid.data
+
+    if not isinstance(binary_voxel_grid, np.ndarray):
+        raise ValueError("binary_voxel_grid must be Voxels or ndarray")
 
     voxel_grid_shape = binary_voxel_grid.shape
+    assert len(voxel_grid_shape) == 3
+
+
     # Initialize all ternary grid values to 0.
     ternary_voxel_grid = np.zeros(voxel_grid_shape)
     # The 'simple' method assumes that the camera is an infinite distance
@@ -242,10 +254,12 @@ def get_ternary_voxel_grid(binary_voxel_grid):
     return ternary_voxel_grid
 
 
+@numba.jit
 def rescale_mesh(vertices, patch_center, voxel_resolution, pc_center_in_voxel_grid):
     return vertices * voxel_resolution - np.array(pc_center_in_voxel_grid) * voxel_resolution + np.array(patch_center)
 
 
+@numba.jit
 def create_voxel_grid_around_point_scaled(
         points,
         patch_center,

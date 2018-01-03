@@ -1,2 +1,21 @@
 #!usr/bin/env python
 
+import curvox.mesh_comparisons
+import argparse
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Compute Hausdorff Distance Between Two Meshes')
+    parser.add_argument('mesh_filepaths', metavar='N', type=str, nargs='+',
+                        help='meshes to compare')
+
+    args = parser.parse_args()
+
+    mesh_files = args.mesh_filepaths
+
+    if len(mesh_files) != 2:
+        print("wrong number of mesh files: wanted 2, got: " + str(len(mesh_files)))
+
+    hausdorff_distance = curvox.mesh_comparisons.hausdorff_distance_bi(mesh_files[0], mesh_files[1])
+
+    curvox.mesh_comparisons.print_hausdorff(hausdorff_distance)

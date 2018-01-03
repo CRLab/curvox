@@ -1,36 +1,51 @@
 from curvox.cloud_to_mesh_conversions import \
-    delaunay_completion, marching_cubes_completion, qhull_completion, gaussian_process_completion \
+    delaunay_completion, marching_cubes_completion, qhull_completion, gaussian_process_completion, \
     delaunay_tactile_completion, marching_cubes_tactile_completion, qhull_tactile_completion, gaussian_process_tactile_completion
-import os
+from curvox.utils import time_fn
 import pcl
-import time
 
 
-def time_fn( fn, *args, **kwargs ):
-    start = time.clock()
-    results = fn( *args, **kwargs )
-    end = time.clock()
-    fn_name = fn.__module__ + "." + fn.__name__
-    print fn_name + ": " + str(end-start) + "s"
-    return results
-
-
-def test_depth_completions():
+def _depth_completion_test(completion_method, completion_name, smoothed):
     bunny_cloud = pcl.load('resources/bunny.pcd')
     bunny_points = bunny_cloud.to_array()
 
     # Testing depth completions only
-    delaunay_ply = time_fn(delaunay_completion, bunny_points)
-    smooth_delaunay_ply = time_fn(delaunay_completion, bunny_points, smooth=True)
+    ply_data = time_fn(completion_method, bunny_points)
 
-    delaunay_ply = time_fn(marching_cubes_completion, bunny_points)
-    smooth_delaunay_ply = time_fn(marching_cubes_completion, bunny_points, smooth=True)
+    smoothed_str = ["unsmoothed", "smoothed"][smoothed]
+    ply_data.write(open("resources/bunny_{}_{}.ply".format(completion_name, smoothed_str), 'w'))
 
-    delaunay_ply = time_fn(qhull_completion, bunny_points)
-    smooth_delaunay_ply = time_fn(qhull_completion, bunny_points, smooth=True)
 
-    delaunay_ply = time_fn(gaussian_process_completion, bunny_points)
-    smooth_delaunay_ply = time_fn(gaussian_process_completion, bunny_points, smooth=True)
+def test_delaunay_completion():
+    _depth_completion_test(delaunay_completion, "delaunay", smoothed=False)
+
+
+def test_delaunay_smoothed_completion():
+    _depth_completion_test(delaunay_completion, "delaunay", smoothed=True)
+
+
+def test_marching_cubes_completion():
+    _depth_completion_test(marching_cubes_completion, "marching_cubes", smoothed=False)
+
+
+def test_marching_cubes_completion_smoothed():
+    _depth_completion_test(marching_cubes_completion, "marching_cubes", smoothed=True)
+
+
+def test_qhull_completion():
+    _depth_completion_test(qhull_completion, "qhull", smoothed=False)
+
+
+def test_qhull_completion_smoothed():
+    _depth_completion_test(qhull_completion, "qhull", smoothed=True)
+
+
+def test_gaussian_process_completion():
+    _depth_completion_test(gaussian_process_completion, "gaussian_process", smoothed=False)
+
+
+def test_gaussian_process_completion_smoothed():
+    _depth_completion_test(gaussian_process_completion, "gaussian_process", smoothed=True)
 
 
 def test_tactile_completions():
@@ -41,16 +56,16 @@ def test_tactile_completions():
 
     # Testing depth completions only
     delaunay_ply = time_fn(delaunay_tactile_completion, depth_points, tactile_points)
-    smooth_delaunay_ply = time_fn(delaunay_tactile_completion, depth_points, tactile_points, smooth=True)
+    # smooth_delaunay_ply = time_fn(delaunay_tactile_completion, depth_points, tactile_points, smooth=True)
 
     delaunay_ply = time_fn(marching_cubes_tactile_completion, depth_points, tactile_points)
-    smooth_delaunay_ply = time_fn(marching_tactile_cubes_completion, depth_points, tactile_points, smooth=True)
+    # smooth_delaunay_ply = time_fn(marching_cubes_tactile_completion, depth_points, tactile_points, smooth=True)
 
     delaunay_ply = time_fn(qhull_tactile_completion, depth_points, tactile_points)
-    smooth_delaunay_ply = time_fn(qhull_tactile_completion, depth_points, tactile_points, smooth=True)
+    # smooth_delaunay_ply = time_fn(qhull_tactile_completion, depth_points, tactile_points, smooth=True)
 
     delaunay_ply = time_fn(gaussian_process_tactile_completion, depth_points, tactile_points)
-    smooth_delaunay_ply = time_fn(gaussian_process_tactile_completion, depth_points, tactile_points, smooth=True)
+    # smooth_delaunay_ply = time_fn(gaussian_process_tactile_completion, depth_points, tactile_points, smooth=True)
 
 
 def test_load_and_save():

@@ -13,12 +13,11 @@ setup(name="curvox",
       author_email='davidwatkins@cs.columbia.edu',
       url='https://github.com/crlab/curvox',
       packages=['curvox'],
-      scripts=['scripts/xmlproc_parse', 'scripts/xmlproc_val'],
+      scripts=['scripts/hausdorff_distance', 'scripts/jaccard_similarity'],
       dependency_links=[
           'https://github.com/crlab/binvox-rw-py/tarball/master#egg=binvox-rw-1.0',
           'https://github.com/ShapeCompletion3D/python-pcl/tarball/master#egg=python-pcl-0.3',
-          'https://github.com/CRLab/MeshLabXML/tarball/master#egg=meshlabxml-2017.9',
-          'https://github.com/GPflow/GPflow/tarball/master#egg=gpflow-1.1.0'
+          'https://github.com/CRLab/MeshLabXML/tarball/master#egg=meshlabxml-2018.1',
       ],
       install_requires=[
           "numpy >= 1.8",
@@ -29,8 +28,9 @@ setup(name="curvox",
           'scipy',
           'matplotlib',
           'pymcubes',
-          'meshlabxml >= 2017.9',
+          'meshlabxml >= 2018.1',
           'pyhull',
-          'gpflow',
-          'pytest'
+          'GPy',
+          'pytest',
+          'numba'
       ])

@@ -1,3 +1,21 @@
 #!usr/bin/env python
 
-from curvox.mesh_comparisons import
+import curvox.mesh_comparisons
+import argparse
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Compute Jaccard Similarity Between Two Meshes')
+    parser.add_argument('mesh_filepaths', metavar='N', type=str, nargs='+',
+                        help='meshes to compare')
+
+    args = parser.parse_args()
+
+    mesh_files = args.mesh_filepaths
+
+    if len(mesh_files) != 2:
+        print("wrong number of mesh files: wanted 2, got: " + str(len(mesh_files)))
+
+    jaccard_distance = curvox.mesh_comparisons.jaccard_similarity(mesh_files[0], mesh_files[1])
+
+    print("Jaccard Distance: {}".format(jaccard_distance))

@@ -10,10 +10,16 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.tri as mtri
 from curvox import pc_vox_utils, binvox_conversions
-import gpflow
 import binvox_rw
+import GPy as gpy
 import types
 import itertools
+
+try:
+    import pycuda
+    useGPU = True
+except ImportError as _:
+    useGPU = False
 
 
 # Helper functions
@@ -21,23 +27,22 @@ import itertools
 
 def smooth_ply(ply_data):
     # Store ply_data in temporary file
-    tmp_ply_fp, tmp_ply_filename = tempfile.mktemp()
-    ply_data.write(tmp_ply_fp)
+    tmp_ply_filename = tempfile.mktemp(suffix=".ply")
+    ply_data.write(open(tmp_ply_filename, 'w'))
 
     # Initialize meshlabserver and meshlabxml script
     unsmoothed_mesh = meshlabxml.FilterScript(file_in=tmp_ply_filename, file_out=tmp_ply_filename, ml_version="1.3.2")
     meshlabxml.smooth.laplacian(unsmoothed_mesh, iterations=6)
-    unsmoothed_mesh.run_script()
+    unsmoothed_mesh.run_script(print_meshlabserver_output=False)
 
     # Read back and store new data
-    ply_data_smoothed = plyfile.PlyData()
-    ply_data_smoothed.read(open(tmp_ply_filename, 'r'))
+    ply_data_smoothed = plyfile.PlyData.read(open(tmp_ply_filename, 'r'))
     return ply_data_smoothed
 
 
 def _generate_gaussian_process_points(points, offsets, observed_value, offset_value):
     offset_points = numpy.zeros(points.shape)
-    offset_points = numpy.subtract(offset_points, offsets, axis=1)
+    offset_points = numpy.subtract(offset_points, offsets)
 
     new_points = numpy.concatenate([points, offset_points])
     observations = numpy.ones((new_points.shape[0], 1))
@@ -46,7 +51,7 @@ def _generate_gaussian_process_points(points, offsets, observed_value, offset_va
     observations[:points.shape[0]] = observed_value
     observations[points.shape[0]:] = offset_value
 
-    return new_points
+    return new_points, observations
 
 
 def _generate_prediction_points(points, patch_size, percent_offset):
@@ -187,13 +192,13 @@ def marching_cubes_completion(points, **kwargs):
     smooth = kwargs.get("smooth", False)
 
     voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = pc_vox_utils.pc_to_binvox(
-        points,
+        points=points,
         patch_size=patch_size,
         percent_offset=percent_offset,
         percent_patch_size=percent_patch_size
     )
 
-    vertices, faces = mcubes.marching_cubes(voxel_grid[:, :, :, 0], marching_cubes_resolution)
+    vertices, faces = mcubes.marching_cubes(voxel_grid.data, marching_cubes_resolution)
     vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, center_point_in_voxel_grid)
 
     ply_data = _generate_ply_data(vertices, faces)
@@ -230,27 +235,40 @@ def gaussian_process_completion(points, **kwargs):
     kernel_variance = kwargs.get("kernel_variance", 0.01)
 
     # Generate gaussian process
-    kernel = gpflow.kernels.RBF(input_dim=3, variance=kernel_variance)
+    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance, useGPU=useGPU)
     points, values = _generate_gaussian_process_points(points, (0, 0, -0.005), 1, 0)
 
+    # Create voxel grid to use for gaussian process
+    prediction_points, voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = \
+        _generate_prediction_points(points, patch_size, percent_offset)
+
     ternary_voxel_grid = pc_vox_utils.get_ternary_voxel_grid(voxel_grid)
-    unoccupied_voxels = numpy.zeros(voxel_grid.shape)
+    unoccupied_voxels = numpy.zeros(voxel_grid.data.shape)
     unoccupied_voxels[ternary_voxel_grid == 0] = 1
 
     # Get indices of every point marked as empty
-    offset = numpy.array(center_point) - numpy.array(pc_center_in_voxel_grid) * voxel_resolution
-    vox = binvox_rw.Voxels(unoccupied_voxels, unoccupied_voxels.shape, tuple(offset), voxel_resolution * patch_size,
-                           "xyz")
+    offset = numpy.array(center_point_in_voxel_grid) - numpy.array(voxel_center) * voxel_resolution
+    vox = binvox_rw.Voxels(unoccupied_voxels, unoccupied_voxels.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
     unoccupied_points = binvox_conversions.binvox_to_pcl(vox)
-    unoccupied_points = unoccupied_points[0:unoccupied_points.size:10]
+    unoccupied_points = unoccupied_points[0:unoccupied_points.size:1000]
 
-    gp = gpflow.models.GPR(points, values, kernel, noise_var=0.005)
-    gp.compile()
+    values_unoccupied = numpy.zeros((unoccupied_points.shape[0], 1))
+
+    print(points.shape, values.shape)
+
+    # points = numpy.concatenate([points, unoccupied_points], axis=0)
+    # values = numpy.concatenate([values, values_unoccupied], axis=0)
+
+    print(points.shape, values.shape)
+
+    gp = gpy.models.GPRegression(points, values, kernel, noise_var=0.005)
+    gp.optimize()
 
     # Create voxel grid to use for gaussian process
-    prediction_points, voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = _generate_prediction_points(points, patch_size, percent_offset)
+    prediction_points, voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = \
+        _generate_prediction_points(points, patch_size, percent_offset)
 
-    prediction = gp.predict_f_full_cov(prediction_points)
+    prediction = gp.predict(prediction_points, full_cov=True)
 
     output_grid = numpy.zeros((patch_size, patch_size, patch_size))
     for counter, (i, j, k) in enumerate(itertools.product(range(patch_size), range(patch_size), range(patch_size))):
@@ -293,16 +311,16 @@ def gaussian_process_tactile_completion(points, **kwargs):
     kernel_variance = kwargs.get("kernel_variance", 0.01)
 
     # Generate gaussian process
-    kernel = gpflow.kernels.RBF(input_dim=3, variance=kernel_variance)
+    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance, useGPU=useGPU)
     points, values = _generate_gaussian_process_points(points, (0, 0, -0.005), 1, 0)
 
-    gp = gpflow.models.GPR(points, values, kernel, noise_var=0.005)
-    gp.compile()
+    gp = gpy.models.GPRegression(points, values, kernel, noise_var=0.005)
+    gp.optimize()
 
     # Create voxel grid to use for gaussian process
     prediction_points, _, voxel_center, voxel_resolution, center_point_in_voxel_grid = _generate_prediction_points(points, patch_size, percent_offset)
 
-    prediction = gp.predict_f_full_cov(prediction_points)
+    prediction = gp.predict(prediction_points, full_cov=True)
 
     output_grid = numpy.zeros((patch_size, patch_size, patch_size))
     for counter, (i, j, k) in enumerate(itertools.product(range(patch_size), range(patch_size), range(patch_size))):
@@ -335,8 +353,8 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, kernel_va
     for i in range(depth_points.shape[0]/2):
         sdf_meas_depth[i] *= 0
 
-    out = _complete_pointcloud_partial(depth_points, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
-    out.write(open("depth.ply", 'w'))
+    # out = _complete_pointcloud_partial(depth_points, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
+    # out.write(open("depth.ply", 'w'))
 
     # Copy tactile points
     points_positive = numpy.copy(tactile_points)
@@ -348,14 +366,14 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, kernel_va
     for i in range(tactile_points.shape[0]/2):
         sdf_meas_tactile[i] *= 0
 
-    out = _complete_pointcloud_partial(tactile_points, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
-    out.write(open("tactile.ply", 'w'))
+    # out = _complete_pointcloud_partial(tactile_points, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
+    # out.write(open("tactile.ply", 'w'))
 
     points = numpy.concatenate([depth_points, tactile_points], axis=0)
     sdf_meas = numpy.concatenate([sdf_meas_depth, sdf_meas_tactile], axis=0)
 
     # Generate gaussian process
-    kernel = gpflow.kernels.RBF(input_dim=3, variance=kernel_variance)
+    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance)
 
     # Create voxel grid to use for gaussian process
     center_point = pc_vox_utils.get_bbox_center(points)
@@ -383,8 +401,8 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, kernel_va
     points = numpy.concatenate([points, unoccupied_points], axis=0)
     sdf_meas = numpy.concatenate([sdf_meas, sdf_meas_unoccupied_points], axis=0)
 
-    gp = gpflow.models.GPR(points, sdf_meas, kernel, noise_var=0.005)
-    gp.compile()
+    gp = gpy.models.GPRegression(points, sdf_meas, kernel, noise_var=0.005)
+    gp.optimize()
 
     # Generate query points
     xs = numpy.arange(center_point[0] - 0.5 * voxel_resolution * patch_size,
@@ -400,7 +418,7 @@ def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, kernel_va
             for z in zs:
                 points.append((x, y, z))
     points = numpy.array(points)
-    prediction = gp.predict_f_full_cov(points)
+    prediction = gp.predict(points, full_cov=True)
 
     output_grid = numpy.zeros((patch_size, patch_size, patch_size))
     counter = 0
@@ -435,5 +453,13 @@ def gaussian_process_depth_tactile_completion(depth_pcd_filenames, tactile_pcd_f
         plydata.write(open(ply_filename, 'wb'))
 
 
-COMPLETION_METHODS = [delaunay_completion, marching_cubes_completion, qhull_completion, gaussian_process_completion]
-TACTILE_COMPLETION_METHODS = []
+COMPLETION_METHODS = [
+    delaunay_completion,
+    marching_cubes_completion,
+    qhull_completion,
+    gaussian_process_completion
+]
+TACTILE_COMPLETION_METHODS = [delaunay_tactile_completion,
+                              marching_cubes_tactile_completion,
+                              qhull_tactile_completion,
+                              gaussian_process_depth_tactile_completion]
