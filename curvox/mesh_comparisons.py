@@ -6,7 +6,7 @@ import plyfile
 import numpy as np
 import numba
 import binvox_rw
-import subprocess
+import commands
 
 
 def print_hausdorff(hausdorff_distance):
@@ -134,8 +134,8 @@ def jaccard_similarity(mesh_filepath0, mesh_filepath1, grid_size=40, exact=True)
     mesh0_cmd = cmd_base + " " + temp_mesh0_filepath
     mesh1_cmd = cmd_base + " " + temp_mesh1_filepath
 
-    subprocess.call(mesh0_cmd.split(" "))
-    subprocess.call(mesh1_cmd.split(" "))
+    commands.getoutput(mesh0_cmd)
+    commands.getoutput(mesh1_cmd)
 
     mesh0_binvox = binvox_rw.read_as_3d_array(open(binvox0_filepath, 'r'))
     mesh1_binvox = binvox_rw.read_as_3d_array(open(binvox1_filepath, 'r'))

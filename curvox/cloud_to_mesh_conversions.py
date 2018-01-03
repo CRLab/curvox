@@ -6,9 +6,6 @@ import mcubes
 import tempfile
 import meshlabxml
 from pyhull.convex_hull import ConvexHull
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.tri as mtri
 from curvox import pc_vox_utils, binvox_conversions
 import binvox_rw
 import GPy as gpy
@@ -41,8 +38,7 @@ def smooth_ply(ply_data):
 
 
 def _generate_gaussian_process_points(points, offsets, observed_value, offset_value):
-    offset_points = numpy.zeros(points.shape)
-    offset_points = numpy.subtract(offset_points, offsets)
+    offset_points = numpy.subtract(points, offsets)
 
     new_points = numpy.concatenate([points, offset_points])
     observations = numpy.ones((new_points.shape[0], 1))
@@ -52,25 +48,6 @@ def _generate_gaussian_process_points(points, offsets, observed_value, offset_va
     observations[points.shape[0]:] = offset_value
 
     return new_points, observations
-
-
-def _generate_prediction_points(points, patch_size, percent_offset):
-    voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = pc_vox_utils.pc_to_binvox(
-        points,
-        patch_size=patch_size,
-        percent_offset=percent_offset
-    )
-
-    # Generate query points
-    xs = numpy.arange(voxel_center[0] - 0.5 * voxel_resolution * patch_size,
-                      voxel_center[0] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-    ys = numpy.arange(voxel_center[1] - 0.5 * voxel_resolution * patch_size,
-                      voxel_center[1] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-    zs = numpy.arange(voxel_center[2] - 0.5 * voxel_resolution * patch_size,
-                      voxel_center[2] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-
-    # Stack all the points together into 3D grid
-    return numpy.vstack(numpy.meshgrid(xs, ys, zs)).reshape(3, -1).T, voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid
 
 
 def _generate_ply_data(points, faces):
@@ -90,19 +67,6 @@ def _generate_ply_data(points, faces):
     face_element = plyfile.PlyElement.describe(faces_np, 'face')
 
     return plyfile.PlyData([vertex_element, face_element], text=True)
-
-
-def plot_values(points, values):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    x = points[:, 0]
-    y = points[:, 1]
-    z = points[:, 2]
-    c = values[:, 0]
-
-    ax.scatter(x, y, z, c=c, cmap=plt.hot())
-    plt.show()
 
 
 # Functions for saving and loading PCL and PLY files
@@ -160,9 +124,8 @@ def complete_tactile_pcd_file_and_save(depth_pcd_filename, tactile_pcd_filename,
 def delaunay_completion(points, **kwargs):
     """
 
-    :param cloud:
-    :type cloud: pcl.PointCloud
-    :param kwargs: Ignored
+    :param points:
+    :param kwargs:
     :return:
     """
     smooth = kwargs.get("smooth", False)
@@ -181,7 +144,7 @@ def delaunay_completion(points, **kwargs):
 def marching_cubes_completion(points, **kwargs):
     """
 
-    :param cloud:
+    :param points:
     :param kwargs:
     :return:
     """
@@ -228,54 +191,75 @@ def qhull_completion(points, **kwargs):
     return ply_data
 
 
-def gaussian_process_completion(points, **kwargs):
-    patch_size = kwargs.get("patch_size", 120)
+def _gaussian_process_helper(points, observations, **kwargs):
+    patch_size = kwargs.get("patch_size", 20)
     percent_offset = kwargs.get("percent_offset", (0.5, 0.5, 0.45))
     smooth = kwargs.get("smooth", False)
     kernel_variance = kwargs.get("kernel_variance", 0.01)
+    percent_patch_size = kwargs.get("percent_patch_size", 0.8)
+    batch_size = kwargs.get("batch_size", 1000)
+
+    print("Here")
 
     # Generate gaussian process
     kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance, useGPU=useGPU)
-    points, values = _generate_gaussian_process_points(points, (0, 0, -0.005), 1, 0)
+
+    print("initialized kernel")
 
     # Create voxel grid to use for gaussian process
-    prediction_points, voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = \
-        _generate_prediction_points(points, patch_size, percent_offset)
+    voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = \
+        pc_vox_utils.pc_to_binvox(points, patch_size=patch_size, percent_offset=percent_offset, percent_patch_size=percent_patch_size)
 
+    print("Created voxel grid: {}".format(voxel_grid.data.shape))
+
+    # Where am I putting my point cloud relative to the center of my voxel grid
+    # ex. (20, 20, 20) or (20, 20, 18)
+    pc_center_in_voxel_grid = (patch_size * percent_offset[0], patch_size * percent_offset[1], patch_size * percent_offset[2])
+
+    # Find all positions that are known to be empty
     ternary_voxel_grid = pc_vox_utils.get_ternary_voxel_grid(voxel_grid)
     unoccupied_voxels = numpy.zeros(voxel_grid.data.shape)
     unoccupied_voxels[ternary_voxel_grid == 0] = 1
 
     # Get indices of every point marked as empty
-    offset = numpy.array(center_point_in_voxel_grid) - numpy.array(voxel_center) * voxel_resolution
+    offset = numpy.array(voxel_center) - numpy.array(pc_center_in_voxel_grid) * voxel_resolution
     vox = binvox_rw.Voxels(unoccupied_voxels, unoccupied_voxels.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
     unoccupied_points = binvox_conversions.binvox_to_pcl(vox)
-    unoccupied_points = unoccupied_points[0:unoccupied_points.size:1000]
+    unoccupied_points = unoccupied_points[0:unoccupied_points.size:10]
 
-    values_unoccupied = numpy.zeros((unoccupied_points.shape[0], 1))
+    print("Unoccupied points: {}".format(unoccupied_points.shape))
 
-    print(points.shape, values.shape)
+    unoccupied_observations = numpy.zeros((unoccupied_points.shape[0], 1))
 
-    # points = numpy.concatenate([points, unoccupied_points], axis=0)
-    # values = numpy.concatenate([values, values_unoccupied], axis=0)
+    points = numpy.concatenate([points, unoccupied_points], axis=0)
+    observations = numpy.concatenate([observations, unoccupied_observations], axis=0)
 
-    print(points.shape, values.shape)
+    while points.shape[0] > batch_size:
+        points = points[::2, :]
+        observations = observations[::2, :]
+        print(points.shape, observations.shape)
 
-    gp = gpy.models.GPRegression(points, values, kernel, noise_var=0.005)
+    gp = gpy.models.GPRegression(points, observations, kernel, noise_var=0.005)
     gp.optimize()
 
-    # Create voxel grid to use for gaussian process
-    prediction_points, voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = \
-        _generate_prediction_points(points, patch_size, percent_offset)
+    # Generate query points
+    xs = numpy.arange(voxel_center[0] - 0.5 * voxel_resolution * patch_size,
+                      voxel_center[0] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
+    ys = numpy.arange(voxel_center[1] - 0.5 * voxel_resolution * patch_size,
+                      voxel_center[1] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
+    zs = numpy.arange(voxel_center[2] - 0.5 * voxel_resolution * patch_size,
+                      voxel_center[2] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
 
-    prediction = gp.predict(prediction_points, full_cov=True)
+    prediction_points = numpy.vstack(numpy.meshgrid(xs, ys, zs)).reshape(3, -1).T
+
+    prediction, _ = gp.predict(prediction_points, full_cov=True)
 
     output_grid = numpy.zeros((patch_size, patch_size, patch_size))
     for counter, (i, j, k) in enumerate(itertools.product(range(patch_size), range(patch_size), range(patch_size))):
-        output_grid[i][j][k] = prediction[0][counter]
+        output_grid[i][j][k] = prediction[counter]
 
     vertices, faces = mcubes.marching_cubes(output_grid[:, :, :], 0.5)
-    vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, center_point_in_voxel_grid)
+    vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, pc_center_in_voxel_grid)
 
     ply_data = _generate_ply_data(vertices, faces)
 
@@ -284,6 +268,16 @@ def gaussian_process_completion(points, **kwargs):
         ply_data = smooth_ply(ply_data)
 
     return ply_data
+
+
+def gaussian_process_completion(points, **kwargs):
+    print("Entering gaussian_process_completion")
+    print("Generating observation points")
+    points, observations = \
+        _generate_gaussian_process_points(points, offsets=(0, 0, 0.01), observed_value=1, offset_value=-1)
+    print(points.shape, observations.shape)
+
+    return _gaussian_process_helper(points, observations, **kwargs)
 
 
 # Tactile completion methods
@@ -304,153 +298,19 @@ def qhull_tactile_completion(depth_points, tactile_points, **kwargs):
     return qhull_completion(points, **kwargs)
 
 
-def gaussian_process_tactile_completion(points, **kwargs):
-    patch_size = kwargs.get("patch_size", 120)
-    percent_offset = kwargs.get("percent_offset", (0.5, 0.5, 0.45))
-    smooth = kwargs.get("smooth", False)
-    kernel_variance = kwargs.get("kernel_variance", 0.01)
-
-    # Generate gaussian process
-    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance, useGPU=useGPU)
-    points, values = _generate_gaussian_process_points(points, (0, 0, -0.005), 1, 0)
-
-    gp = gpy.models.GPRegression(points, values, kernel, noise_var=0.005)
-    gp.optimize()
-
-    # Create voxel grid to use for gaussian process
-    prediction_points, _, voxel_center, voxel_resolution, center_point_in_voxel_grid = _generate_prediction_points(points, patch_size, percent_offset)
-
-    prediction = gp.predict(prediction_points, full_cov=True)
-
-    output_grid = numpy.zeros((patch_size, patch_size, patch_size))
-    for counter, (i, j, k) in enumerate(itertools.product(range(patch_size), range(patch_size), range(patch_size))):
-        output_grid[i][j][k] = prediction[0][counter]
-
-    vertices, faces = mcubes.marching_cubes(output_grid[:, :, :], 0.5)
-    vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, center_point_in_voxel_grid)
-
-    ply_data = _generate_ply_data(vertices, faces)
-
-    # If we are smoothing use meshlabserver to smooth over mesh
-    if smooth:
-        ply_data = smooth_ply(ply_data)
-
-    return ply_data
-
-
-def _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, kernel_variance, tactile_cloud, patch_size, percent_x, percent_y, percent_z, percent_patch_size):
-    depth_points = depth_cloud.to_array()
-    tactile_points = tactile_cloud.to_array()
-
-
+def gaussian_process_tactile_completion(depth_points, tactile_points, **kwargs):
     # Copy depth points
-    points_positive = numpy.copy(depth_points)
-    # points_positive[:, 2] += 0.01
-    points_negative = numpy.copy(depth_points)
-    points_negative[:, 2] -= 0.005
-    depth_points = numpy.concatenate([points_negative, points_positive], axis=0)
-    sdf_meas_depth = numpy.ones((depth_points.shape[0], 1))
-    for i in range(depth_points.shape[0]/2):
-        sdf_meas_depth[i] *= 0
-
-    # out = _complete_pointcloud_partial(depth_points, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
-    # out.write(open("depth.ply", 'w'))
+    depth_points, depth_observations = \
+        _generate_gaussian_process_points(depth_points, offsets=(0, 0, 0.005), observed_value=1, offset_value=0)
 
     # Copy tactile points
-    points_positive = numpy.copy(tactile_points)
-    # points_positive[:, 2] += 0.01
-    points_negative = numpy.copy(tactile_points)
-    points_negative[:, 2] -= 0.005
-    tactile_points = numpy.concatenate([points_positive, points_negative], axis=0)
-    sdf_meas_tactile = numpy.ones((tactile_points.shape[0], 1))
-    for i in range(tactile_points.shape[0]/2):
-        sdf_meas_tactile[i] *= 0
-
-    # out = _complete_pointcloud_partial(tactile_points, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
-    # out.write(open("tactile.ply", 'w'))
+    tactile_points, tactile_observations = \
+        _generate_gaussian_process_points(tactile_points, offsets=(0, 0, -0.005), observed_value=0, offset_value=1)
 
     points = numpy.concatenate([depth_points, tactile_points], axis=0)
-    sdf_meas = numpy.concatenate([sdf_meas_depth, sdf_meas_tactile], axis=0)
+    observations = numpy.concatenate([depth_observations, tactile_observations], axis=0)
 
-    # Generate gaussian process
-    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance)
-
-    # Create voxel grid to use for gaussian process
-    center_point = pc_vox_utils.get_bbox_center(points)
-    voxel_resolution = pc_vox_utils.get_voxel_resolution(points, patch_size)
-
-    # Where am I putting my point cloud relative to the center of my voxel grid
-    # ex. (20, 20, 20) or (20, 20, 18)
-    pc_center_in_voxel_grid = (patch_size * percent_x, patch_size * percent_y, patch_size * percent_z)
-
-    voxel_grid = pc_vox_utils.voxelize_points(points, center_point, voxel_resolution, patch_size,
-                                              pc_center_in_voxel_grid)
-
-    ternary_voxel_grid = pc_vox_utils.get_ternary_voxel_grid(voxel_grid)
-    unoccupied_voxels = numpy.zeros(voxel_grid.shape)
-    unoccupied_voxels[ternary_voxel_grid == 0] = 1
-
-    # Get indices of every point marked as empty
-    offset = numpy.array(center_point) - numpy.array(pc_center_in_voxel_grid) * voxel_resolution
-    vox = binvox_rw.Voxels(unoccupied_voxels, unoccupied_voxels.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
-    unoccupied_points = binvox_conversions.binvox_to_pcl(vox)
-    unoccupied_points = unoccupied_points[0:unoccupied_points.size:10]
-
-    sdf_meas_unoccupied_points = numpy.zeros((unoccupied_points.shape[0], 1))
-
-    points = numpy.concatenate([points, unoccupied_points], axis=0)
-    sdf_meas = numpy.concatenate([sdf_meas, sdf_meas_unoccupied_points], axis=0)
-
-    gp = gpy.models.GPRegression(points, sdf_meas, kernel, noise_var=0.005)
-    gp.optimize()
-
-    # Generate query points
-    xs = numpy.arange(center_point[0] - 0.5 * voxel_resolution * patch_size,
-                      center_point[0] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-    ys = numpy.arange(center_point[1] - 0.5 * voxel_resolution * patch_size,
-                      center_point[1] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-    zs = numpy.arange(center_point[2] - 0.5 * voxel_resolution * patch_size,
-                      center_point[2] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-
-    points = []
-    for x in xs:
-        for y in ys:
-            for z in zs:
-                points.append((x, y, z))
-    points = numpy.array(points)
-    prediction = gp.predict(points, full_cov=True)
-
-    output_grid = numpy.zeros((patch_size, patch_size, patch_size))
-    counter = 0
-    for i, x in enumerate(xs):
-        for j, y in enumerate(ys):
-            for k, z in enumerate(zs):
-                output_grid[i][j][k] = prediction[0][counter]
-                counter += 1
-
-    vertices, faces = mcubes.marching_cubes(output_grid[:, :, :], 0.5)
-    vertices = rescale_mesh(vertices, center_point, voxel_resolution, pc_center_in_voxel_grid)
-
-    # Export to plyfile type
-    return _generate_ply_data(vertices, faces)
-
-
-def gaussian_process_depth_tactile_completion(depth_pcd_filenames, tactile_pcd_filenames, **kwargs):
-    patch_size = kwargs.get("patch_size", 120)
-    percent_x = kwargs.get("percent_x", 0.5)
-    percent_y = kwargs.get("percent_y", 0.5)
-    percent_z = kwargs.get("percent_z", 0.45)
-    percent_patch_size = kwargs.get("percent_patch_size", 0.8)
-    suffix = kwargs.get("suffix", "")
-
-    for (depth_pcd_filename, tactile_pcd_filename) in zip(depth_pcd_filenames, tactile_pcd_filenames):
-        depth_cloud = pcl.load(depth_pcd_filename)
-        tactile_cloud = pcl.load(tactile_pcd_filename)
-
-        plydata = _gaussian_process_pointcloud_depth_tactile_completion(depth_cloud, tactile_cloud, patch_size, percent_x, percent_y, percent_z, percent_patch_size)
-
-        ply_filename = depth_pcd_filename.replace(".pcd", suffix + ".ply")
-        plydata.write(open(ply_filename, 'wb'))
+    return _gaussian_process_helper(points, observations, **kwargs)
 
 
 COMPLETION_METHODS = [
@@ -462,4 +322,4 @@ COMPLETION_METHODS = [
 TACTILE_COMPLETION_METHODS = [delaunay_tactile_completion,
                               marching_cubes_tactile_completion,
                               qhull_tactile_completion,
-                              gaussian_process_depth_tactile_completion]
+                              gaussian_process_tactile_completion]
