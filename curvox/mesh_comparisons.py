@@ -102,6 +102,10 @@ def _jaccard_distance(grid1, grid2):
 
     union = np.logical_or(grid1, grid2)
     union_count = np.count_nonzero(union)
+    
+    if union_count == 0:
+        return 0.0
+    
     return float(intersection_count) / float(union_count)
 
 
