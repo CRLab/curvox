@@ -82,7 +82,7 @@ def read_obj_file(obj_filepath):
 def convert_obj_to_ply(obj_filepath, ply_filepath):
     verts, faces = read_obj_file(obj_filepath)
     ply_data = generate_ply_data(verts, faces)
-    ply_data.write(open(ply_filepath, 'w'))
+    return ply_data
 
 
 # Functions for saving and loading PCL and PLY files
