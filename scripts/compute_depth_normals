@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+import pcl
+import argparse
+import curvox.cloud_conversions
+
+if __name__ == "__main__":
+
+
+	parser = argparse.ArgumentParser(description='Compute normals for captured depth pointcloud')
+	parser.add_argument('-i', '--input_pcd_filepath', type=str,
+						default='./data/inputs/Bunny_ascii.pcd',
+	                    help='input pcd file')
+	parser.add_argument('-o', '--output_pcd_filepath' , type=str,
+						default="temp.pcd",
+	                    help='output pcd file with computed normals')
+	parser.add_argument('-k', '--ksearch' , type=int,
+						default=10,
+	                    help='number of nearest neighbors to use while computing normals')
+	parser.add_argument('-r', '--search_radius' , type=int,
+						default=0,
+	                    help='radius to use while computing normals')
+
+	args = parser.parse_args()
+
+	cloud = pcl.PointCloud()
+	cloud.from_file(args.input_pcd_filepath)
+	points = cloud.to_array()
+
+	normals = curvox.cloud_conversions.compute_depth_normals(cloud, args.ksearch, args.search_radius)
+    curvox.cloud_conversions.write_pcd_with_normals(points, normals, args.output_pcd_filepath)

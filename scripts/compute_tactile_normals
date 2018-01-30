@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+import pcl
+import argparse
+import curvox.cloud_conversions
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Compute normals for captured depth pointcloud')
+    parser.add_argument('input_pcd_filepath', type=str,
+                        help='input pcd file')
+    parser.add_argument('output_pcd_filepath', type=str,
+                        help='output pcd file with computed normals')
+
+    args = parser.parse_args()
+
+    cloud = pcl.PointCloud()
+    cloud.from_file(args.input_pcd_filepath)
+    points = cloud.to_array()
+
+    normals = curvox.cloud_conversions.compute_tactile_normals(cloud)
+    curvox.cloud_conversions.write_pcd_with_normals(points, normals, args.output_pcd_filepath)
