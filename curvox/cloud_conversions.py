@@ -43,9 +43,11 @@ def compute_depth_normals(pcd, ksearch, search_radius):
     return normals
 
 
-def calculate_normals_from_depth_and_tactile(depth_cloud, tactile_cloud, depth_downsample_factor):
+def calculate_normals_from_depth_and_tactile(depth_cloud, tactile_cloud, downsampled_pointcloud_size):
     v_points = depth_cloud.to_array()
     v_normals = compute_depth_normals(depth_cloud, ksearch=10, search_radius=0)
+
+    depth_downsample_factor = v_points.shape[0] / downsampled_pointcloud_size
 
     v_points = v_points[::depth_downsample_factor]
     v_normals = v_normals[::depth_downsample_factor]
