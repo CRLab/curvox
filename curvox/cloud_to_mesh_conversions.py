@@ -25,7 +25,8 @@ except ImportError as _:
 def smooth_ply(ply_data):
     # Store ply_data in temporary file
     tmp_ply_filename = tempfile.mktemp(suffix=".ply")
-    ply_data.write(open(tmp_ply_filename, 'w'))
+    with open(tmp_ply_filename, 'w') as tmp_ply_file:
+        ply_data.write(tmp_ply_file)
 
     # Initialize meshlabserver and meshlabxml script
     unsmoothed_mesh = meshlabxml.FilterScript(file_in=tmp_ply_filename, file_out=tmp_ply_filename, ml_version="1.3.2")
@@ -33,7 +34,8 @@ def smooth_ply(ply_data):
     unsmoothed_mesh.run_script(print_meshlabserver_output=False, skip_error=True)
 
     # Read back and store new data
-    ply_data_smoothed = plyfile.PlyData.read(open(tmp_ply_filename, 'r'))
+    with open(tmp_ply_filename, 'r') as tmp_ply_file:
+        ply_data_smoothed = plyfile.PlyData.read(tmp_ply_file)
     return ply_data_smoothed
 
 
