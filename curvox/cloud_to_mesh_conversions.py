@@ -79,7 +79,7 @@ def read_obj_file(obj_filepath):
     return verts, faces
 
 
-def convert_obj_to_ply(obj_filepath, ply_filepath):
+def convert_obj_to_ply(obj_filepath):
     verts, faces = read_obj_file(obj_filepath)
     ply_data = generate_ply_data(verts, faces)
     return ply_data
