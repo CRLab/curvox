@@ -102,6 +102,10 @@ def _jaccard_distance(grid1, grid2):
 
     union = np.logical_or(grid1, grid2)
     union_count = np.count_nonzero(union)
+    
+    if union_count == 0:
+        return 0.0
+    
     return float(intersection_count) / float(union_count)
 
 
@@ -137,8 +141,10 @@ def jaccard_similarity(mesh_filepath0, mesh_filepath1, grid_size=40, exact=True)
     commands.getoutput(mesh0_cmd)
     commands.getoutput(mesh1_cmd)
 
-    mesh0_binvox = binvox_rw.read_as_3d_array(open(binvox0_filepath, 'r'))
-    mesh1_binvox = binvox_rw.read_as_3d_array(open(binvox1_filepath, 'r'))
+    with open(binvox0_filepath, 'r') as mesh0_binvox_file:
+        mesh0_binvox = binvox_rw.read_as_3d_array(mesh0_binvox_file)
+    with open(binvox1_filepath, 'r') as mesh1_binvox_file:
+        mesh1_binvox = binvox_rw.read_as_3d_array(mesh1_binvox_file)
 
     jaccard = _jaccard_distance(mesh0_binvox.data, mesh1_binvox.data)
 

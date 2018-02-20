@@ -1,8 +1,64 @@
 import pcl
 import numpy as np
-import sensor_msgs.point_cloud2 as pcl2
-import std_msgs
-import rospy
+import curvox.cloud_transformations
+
+
+def write_pcd_with_normals(points, normals, output_pcd_filepath):
+
+    with open(output_pcd_filepath, 'w') as new_pcd_file:
+        new_pcd_file.write(
+            "# .PCD v0.7 - Point Cloud Data file format\n"
+            "VERSION 0.7\n"
+            "FIELDS x y z normal_x normal_y normal_z\n"
+            "SIZE 4 4 4 4 4 4\n"
+            "TYPE F F F F F F\n"
+            "COUNT 1 1 1 1 1 1\n"
+            "WIDTH {0}\n"
+            "HEIGHT 1\n"
+            "POINTS {0}\n"
+            "DATA ascii\n"
+                .format(points.shape[0])
+        )
+
+        for point, normal in zip(points, normals):
+            new_pcd_file.write("{} {} {} {} {} {}\n".format(point[0], point[1], point[2], normal[0], normal[1], normal[2]))
+
+
+def compute_tactile_normals(cloud):
+    points = cloud.to_array()
+    num_points = points.shape[0]
+    # n x 1 magnitude of each point
+    magnitudes = np.linalg.norm(points, axis=1).reshape((num_points, 1))
+    # divide points by per point magnitude, and flip sign to point back at origin
+    normals = points / magnitudes
+
+    return normals
+
+
+def compute_depth_normals(pcd, ksearch, search_radius):
+    points = pcd.to_array()
+    # Convert PCD to PCD with normals
+    normals = pcd.calc_normals(ksearch=ksearch, search_radius=search_radius)
+
+    return normals
+
+
+def calculate_normals_from_depth_and_tactile(depth_cloud, tactile_cloud, downsampled_pointcloud_size):
+    v_points = depth_cloud.to_array()
+    v_normals = compute_depth_normals(depth_cloud, ksearch=10, search_radius=0)
+
+    depth_downsample_factor = v_points.shape[0] / downsampled_pointcloud_size
+
+    v_points = v_points[::depth_downsample_factor]
+    v_normals = v_normals[::depth_downsample_factor]
+
+    t_points = tactile_cloud.to_array()
+    t_normals = compute_tactile_normals(tactile_cloud)
+
+    vt_points = np.concatenate([v_points, t_points])
+    vt_normals = np.concatenate([v_normals, t_normals])
+
+    return vt_points, vt_normals
 
 
 def pcd_to_np(pcd_filename):
@@ -40,67 +96,4 @@ def np_to_pcl(pc_np):
     new_pcd = pcl.PointCloud(np.array(pc_np, np.float32))
     return new_pcd
 
-
-def cloud_msg_to_np(msg):
-    """
-    Take a ros pointclud message and convert it to
-    an nx3 numpy ndarray.
-
-    :type msg: sensor_msg.msg.PointCloud2
-    :rtype numpy.ndarray
-    """
-
-    num_pts = msg.width*msg.height
-    out = np.zeros((num_pts, 4))
-    count = 0
-    for point in pcl2.read_points(msg, skip_nans=False):
-        out[count] = point
-        count += 1
-
-    # if there were nans, we need to resize cloud to skip them.
-    out = out[:count, 0:3]
-    return out
-
-
-def np_to_cloud_msg(pc_np, frame_id):
-    """
-    :type pc_np: numpy.ndarray
-    :param pc_np: A nx3 pointcloud
-    :rtype sensor_msg.msg.PointCloud2
-    """
-
-    header = std_msgs.msg.Header()
-    header.stamp = rospy.Time.now()
-    header.frame_id = frame_id
-    cloud_msg = pcl2.create_cloud_xyz32(header, pc_np)
-
-    return cloud_msg
-
-
-def transform_cloud(pc, transform):
-    """
-    :type pc: numpy.ndarray
-    :type transform: numpy.ndarray
-    :param transform: A 4x4 homogenous transform to apply to the cloud
-    :param pc: A nx3 pointcloud
-    :rtype numpy.ndarray
-    """
-
-    if len(pc.shape) != 2:
-        print("Warning, pc shape length should be 2")
-    if pc.shape[1] != 3:
-        print("Warning: pc.shape[1] != 3 your pointcloud may be transposed!!!")
-
-    num_pts = pc.shape[0]
-    homogenous_coords = np.ones((num_pts, 4))
-    homogenous_coords[:, 0:3] = pc
-
-    #need points to be 4xn
-    homogenous_coords = homogenous_coords.T
-
-    out_4xn = np.dot(transform, homogenous_coords)
-
-    out_nx3 = out_4xn.T[:, 0:3]
-
-    return out_nx3
 

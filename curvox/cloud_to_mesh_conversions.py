@@ -25,15 +25,17 @@ except ImportError as _:
 def smooth_ply(ply_data):
     # Store ply_data in temporary file
     tmp_ply_filename = tempfile.mktemp(suffix=".ply")
-    ply_data.write(open(tmp_ply_filename, 'w'))
+    with open(tmp_ply_filename, 'w') as tmp_ply_file:
+        ply_data.write(tmp_ply_file)
 
     # Initialize meshlabserver and meshlabxml script
     unsmoothed_mesh = meshlabxml.FilterScript(file_in=tmp_ply_filename, file_out=tmp_ply_filename, ml_version="1.3.2")
     meshlabxml.smooth.laplacian(unsmoothed_mesh, iterations=6)
-    unsmoothed_mesh.run_script(print_meshlabserver_output=False)
+    unsmoothed_mesh.run_script(print_meshlabserver_output=False, skip_error=True)
 
     # Read back and store new data
-    ply_data_smoothed = plyfile.PlyData.read(open(tmp_ply_filename, 'r'))
+    with open(tmp_ply_filename, 'r') as tmp_ply_file:
+        ply_data_smoothed = plyfile.PlyData.read(tmp_ply_file)
     return ply_data_smoothed
 
 
@@ -50,7 +52,7 @@ def _generate_gaussian_process_points(points, offsets, observed_value, offset_va
     return new_points, observations
 
 
-def _generate_ply_data(points, faces):
+def generate_ply_data(points, faces):
     """
 
     :param points:
@@ -67,6 +69,22 @@ def _generate_ply_data(points, faces):
     face_element = plyfile.PlyElement.describe(faces_np, 'face')
 
     return plyfile.PlyData([vertex_element, face_element], text=True)
+
+
+def read_obj_file(obj_filepath):
+    with open(obj_filepath, 'r') as f:
+        lines = f.readlines()
+        verts = numpy.array([[float(v) for v in l.strip().split(' ')[1:]] for l in lines if
+                          l[0] == 'v' and len(l.strip().split(' ')) == 4])
+        faces = numpy.array([[int(v) for v in l.strip().split(' ')[1:]] for l in lines if l[0] == 'f'])
+    faces -= 1
+    return verts, faces
+
+
+def convert_obj_to_ply(obj_filepath):
+    verts, faces = read_obj_file(obj_filepath)
+    ply_data = generate_ply_data(verts, faces)
+    return ply_data
 
 
 # Functions for saving and loading PCL and PLY files
@@ -133,7 +151,7 @@ def delaunay_completion(points, **kwargs):
     # Triangulate points in (x, y) coordinate plane
     tri = scipy.spatial.Delaunay(points[:, 0:2])
 
-    ply_data = _generate_ply_data(points, tri.simplices)
+    ply_data = generate_ply_data(points, tri.simplices)
     if smooth:
         ply_data = smooth_ply(ply_data)
 
@@ -164,7 +182,7 @@ def marching_cubes_completion(points, **kwargs):
     vertices, faces = mcubes.marching_cubes(voxel_grid.data, marching_cubes_resolution)
     vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, center_point_in_voxel_grid)
 
-    ply_data = _generate_ply_data(vertices, faces)
+    ply_data = generate_ply_data(vertices, faces)
 
     # If we are smoothing use meshlabserver to smooth over mesh
     if smooth:
@@ -182,7 +200,7 @@ def qhull_completion(points, **kwargs):
     # Fix inverted normals from pyhull
     hull.vertices = [vertex[::-1] for vertex in hull.vertices]
 
-    ply_data = _generate_ply_data(points, hull.vertices)
+    ply_data = generate_ply_data(points, hull.vertices)
 
     # If we are smoothing use meshlabserver to smooth over mesh
     if smooth:
@@ -261,7 +279,7 @@ def _gaussian_process_helper(points, observations, **kwargs):
     vertices, faces = mcubes.marching_cubes(output_grid[:, :, :], 0.5)
     vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, pc_center_in_voxel_grid)
 
-    ply_data = _generate_ply_data(vertices, faces)
+    ply_data = generate_ply_data(vertices, faces)
 
     # If we are smoothing use meshlabserver to smooth over mesh
     if smooth:
