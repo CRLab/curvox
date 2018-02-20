@@ -58,7 +58,7 @@ def minmax(array):
 def hausdorff_distance_one_direction(mesh1_filepath, mesh2_filepath):
     script = meshlabxml.create.FilterScript(file_in=[mesh1_filepath, mesh2_filepath], ml_version='1.3.2')
     meshlabxml.sampling.hausdorff_distance(script)
-    script.run_script(print_meshlabserver_output=False)
+    script.run_script(print_meshlabserver_output=False, skip_error=True)
     return script.hausdorff_distance
 
 
@@ -109,7 +109,6 @@ def _jaccard_distance(grid1, grid2):
     return float(intersection_count) / float(union_count)
 
 
-@numba.jit
 def jaccard_similarity(mesh_filepath0, mesh_filepath1, grid_size=40, exact=True):
     temp_mesh0_filepath = tempfile.mktemp(suffix=".ply")
     temp_mesh1_filepath = tempfile.mktemp(suffix=".ply")
@@ -138,8 +137,8 @@ def jaccard_similarity(mesh_filepath0, mesh_filepath1, grid_size=40, exact=True)
     mesh0_cmd = cmd_base + " " + temp_mesh0_filepath
     mesh1_cmd = cmd_base + " " + temp_mesh1_filepath
 
-    commands.getoutput(mesh0_cmd)
-    commands.getoutput(mesh1_cmd)
+    command1_output = commands.getoutput(mesh0_cmd)
+    command2_output = commands.getoutput(mesh1_cmd)
 
     with open(binvox0_filepath, 'r') as mesh0_binvox_file:
         mesh0_binvox = binvox_rw.read_as_3d_array(mesh0_binvox_file)
