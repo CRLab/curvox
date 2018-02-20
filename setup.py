@@ -18,7 +18,7 @@ setup(name="curvox",
       package_data={'curvox': ['bin/binvox']},
       dependency_links=[
           'https://github.com/crlab/binvox-rw-py/tarball/master#egg=binvox-rw-1.0',
-          'https://github.com/ShapeCompletion3D/python-pcl/tarball/master#egg=python-pcl-0.3',
+          'https://github.com/crlab/python-pcl/tarball/master#egg=python-pcl-0.3',
           'https://github.com/CRLab/MeshLabXML/tarball/master#egg=meshlabxml-2018.1',
       ],
       install_requires=[
