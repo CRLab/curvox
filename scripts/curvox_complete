@@ -1,0 +1,48 @@
+#!usr/bin/env python
+
+import curvox.cloud_to_mesh_conversions
+import curvox.mesh_conversions
+import argparse
+import pcl
+import numpy as np
+
+_string_to_completion_map = {
+    "qhull": curvox.cloud_to_mesh_conversions.qhull_completion,
+    "marching_cubes": curvox.cloud_to_mesh_conversions.marching_cubes_completion,
+    "delaunay": curvox.cloud_to_mesh_conversions.delaunay_completion
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Complete a single point cloud using specified completion method")
+    parser.add_argument('pcl_filepath', type=str, help='pcl file to complete')
+    parser.add_argument('--out_file', type=str, default='completion.ply', help='ply output file')
+    parser.add_argument('--completion_method_name', type=str, default='marching_cubes',
+                        help="Which completion method to use", choices=_string_to_completion_map.keys())
+    parser.add_argument('--smooth', action='store_true', help='Apply Laplacian smoothing to result')
+    parser.add_argument('--transform_file', type=str, default=None, help="Transform of object")
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+
+    completion_function = _string_to_completion_map.get(args.completion_method_name, None)
+    if completion_function is None:
+        raise ValueError("Completion method '{}' is not valid".format(args.completion_method_name))
+
+    depth_np = pcl.load(args.pcl_filepath).to_array()
+    ply_data = completion_function(depth_np, smooth=args.smooth)
+
+    # Transform completion to world frame and write to file
+    if args.transform_file is not None:
+        cf_to_wf_transform = np.load(args.transform_file)
+        ply_data = curvox.mesh_conversions.transform_ply(ply_data, cf_to_wf_transform)
+
+    ply_data.write(open(args.out_file, 'wb'))
+
+
+if __name__ == "__main__":
+    main()
