@@ -3,6 +3,45 @@ import numpy
 import plyfile
 import geometry_msgs.msg
 import copy
+import collada
+
+
+def mesh_msg_to_dae(mesh_msg):
+    """
+    Converts a ROS mesh into a collada object which can be then written to a file
+    :type mesh_msg: shape_msgs.msg.Mesh
+    :rtype collada.Collada
+    """
+    vs = []
+    for vert in mesh_msg.vertices:
+        vs.append((vert.x, vert.y, vert.z))
+    vertices = numpy.array(vs)
+
+    ts = []
+    for tri in mesh_msg.triangles:
+        ts.append(tri.vertex_indices)
+    triangles = numpy.array(ts)
+
+    mesh = collada.Collada()
+
+    vert_src = collada.source.FloatSource("verts-array", vertices, ('X','Y','Z'))
+    geom = collada.geometry.Geometry(mesh, "geometry0", "curvox_mesh", [vert_src])
+
+    input_list = collada.source.InputList()
+    input_list.addInput(0, 'VERTEX', "#verts-array")
+
+    triset = geom.createTriangleSet(numpy.copy(triangles), input_list, "")
+    geom.primitives.append(triset)
+    mesh.geometries.append(geom)
+
+    geomnode = collada.scene.GeometryNode(geom, [])
+    node = collada.scene.Node("curvox_mesh", children=[geomnode])
+
+    myscene = collada.scene.Scene("mcubes_scene", [node])
+    mesh.scenes.append(myscene)
+    mesh.scene = myscene
+
+    return mesh
 
 
 def mesh_msg_to_ply(mesh_msg):

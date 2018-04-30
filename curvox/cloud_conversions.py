@@ -1,6 +1,5 @@
 import pcl
 import numpy as np
-import curvox.cloud_transformations
 
 
 def write_pcd_with_normals(points, normals, output_pcd_filepath):
