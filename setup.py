@@ -22,24 +22,5 @@ setup(name="curvox",
                'scripts/curvox_binvox_to_ply',
                ],
       include_package_data=True,
-      package_data={'curvox': ['bin/binvox']},
-      dependency_links=[
-          'https://github.com/crlab/binvox-rw-py/tarball/master#egg=binvox-rw-1.0',
-          'https://github.com/CRLab/python-pcl/tarball/master#egg=python-pcl-0.3',
-          'https://github.com/CRLab/MeshLabXML/tarball/master#egg=meshlabxml-2018.1',
-      ],
-      install_requires=[
-          "numpy >= 1.8",
-          "binvox-rw >= 1.0",
-          "plyfile >= 0.4",
-          'cython',
-          'python-pcl >= 0.2',
-          'scipy',
-          'matplotlib',
-          'pymcubes',
-          'meshlabxml >= 2018.1',
-          'pyhull',
-          'GPy',
-          'pytest',
-          'numba'
-      ])
+      package_data={'curvox': ['bin/binvox']}
+)

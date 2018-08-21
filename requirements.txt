@@ -1,0 +1,13 @@
+numpy>=1.8
+plyfile>=0.4
+cython
+scipy
+matplotlib
+pymcubes
+pyhull
+pytest
+numba
+pycollada
+-e git://github.com/crlab/binvox-rw-py.git#egg=binvox-rw
+-e git://github.com/CRLab/python-pcl.git#egg=python-pcl
+-e git://github.com/CRLab/MeshLabXML.git#egg=meshlabxml

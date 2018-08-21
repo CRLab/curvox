@@ -6,17 +6,8 @@ import mcubes
 import tempfile
 import meshlabxml
 from pyhull.convex_hull import ConvexHull
-from curvox import pc_vox_utils, binvox_conversions
-import binvox_rw
-import GPy as gpy
+from curvox import pc_vox_utils
 import types
-import itertools
-
-try:
-    import pycuda
-    useGPU = True
-except ImportError as _:
-    useGPU = False
 
 
 # Helper functions
@@ -209,95 +200,6 @@ def qhull_completion(points, **kwargs):
     return ply_data
 
 
-def _gaussian_process_helper(points, observations, **kwargs):
-    patch_size = kwargs.get("patch_size", 20)
-    percent_offset = kwargs.get("percent_offset", (0.5, 0.5, 0.45))
-    smooth = kwargs.get("smooth", False)
-    kernel_variance = kwargs.get("kernel_variance", 0.01)
-    percent_patch_size = kwargs.get("percent_patch_size", 0.8)
-    batch_size = kwargs.get("batch_size", 1000)
-
-    print("Here")
-
-    # Generate gaussian process
-    kernel = gpy.kern.RBF(input_dim=3, variance=kernel_variance, useGPU=useGPU)
-
-    print("initialized kernel")
-
-    # Create voxel grid to use for gaussian process
-    voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid = \
-        pc_vox_utils.pc_to_binvox(points, patch_size=patch_size, percent_offset=percent_offset, percent_patch_size=percent_patch_size)
-
-    print("Created voxel grid: {}".format(voxel_grid.data.shape))
-
-    # Where am I putting my point cloud relative to the center of my voxel grid
-    # ex. (20, 20, 20) or (20, 20, 18)
-    pc_center_in_voxel_grid = (patch_size * percent_offset[0], patch_size * percent_offset[1], patch_size * percent_offset[2])
-
-    # Find all positions that are known to be empty
-    ternary_voxel_grid = pc_vox_utils.get_ternary_voxel_grid(voxel_grid)
-    unoccupied_voxels = numpy.zeros(voxel_grid.data.shape)
-    unoccupied_voxels[ternary_voxel_grid == 0] = 1
-
-    # Get indices of every point marked as empty
-    offset = numpy.array(voxel_center) - numpy.array(pc_center_in_voxel_grid) * voxel_resolution
-    vox = binvox_rw.Voxels(unoccupied_voxels, unoccupied_voxels.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
-    unoccupied_points = binvox_conversions.binvox_to_pcl(vox)
-    unoccupied_points = unoccupied_points[0:unoccupied_points.size:10]
-
-    print("Unoccupied points: {}".format(unoccupied_points.shape))
-
-    unoccupied_observations = numpy.zeros((unoccupied_points.shape[0], 1))
-
-    points = numpy.concatenate([points, unoccupied_points], axis=0)
-    observations = numpy.concatenate([observations, unoccupied_observations], axis=0)
-
-    while points.shape[0] > batch_size:
-        points = points[::2, :]
-        observations = observations[::2, :]
-        print(points.shape, observations.shape)
-
-    gp = gpy.models.GPRegression(points, observations, kernel, noise_var=0.005)
-    gp.optimize()
-
-    # Generate query points
-    xs = numpy.arange(voxel_center[0] - 0.5 * voxel_resolution * patch_size,
-                      voxel_center[0] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-    ys = numpy.arange(voxel_center[1] - 0.5 * voxel_resolution * patch_size,
-                      voxel_center[1] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-    zs = numpy.arange(voxel_center[2] - 0.5 * voxel_resolution * patch_size,
-                      voxel_center[2] + 0.5 * voxel_resolution * patch_size, voxel_resolution)
-
-    prediction_points = numpy.vstack(numpy.meshgrid(xs, ys, zs)).reshape(3, -1).T
-
-    prediction, _ = gp.predict(prediction_points, full_cov=True)
-
-    output_grid = numpy.zeros((patch_size, patch_size, patch_size))
-    for counter, (i, j, k) in enumerate(itertools.product(range(patch_size), range(patch_size), range(patch_size))):
-        output_grid[i][j][k] = prediction[counter]
-
-    vertices, faces = mcubes.marching_cubes(output_grid[:, :, :], 0.5)
-    vertices = pc_vox_utils.rescale_mesh(vertices, voxel_center, voxel_resolution, pc_center_in_voxel_grid)
-
-    ply_data = generate_ply_data(vertices, faces)
-
-    # If we are smoothing use meshlabserver to smooth over mesh
-    if smooth:
-        ply_data = smooth_ply(ply_data)
-
-    return ply_data
-
-
-def gaussian_process_completion(points, **kwargs):
-    print("Entering gaussian_process_completion")
-    print("Generating observation points")
-    points, observations = \
-        _generate_gaussian_process_points(points, offsets=(0, 0, 0.01), observed_value=1, offset_value=-1)
-    print(points.shape, observations.shape)
-
-    return _gaussian_process_helper(points, observations, **kwargs)
-
-
 # Tactile completion methods
 
 
@@ -316,28 +218,13 @@ def qhull_tactile_completion(depth_points, tactile_points, **kwargs):
     return qhull_completion(points, **kwargs)
 
 
-def gaussian_process_tactile_completion(depth_points, tactile_points, **kwargs):
-    # Copy depth points
-    depth_points, depth_observations = \
-        _generate_gaussian_process_points(depth_points, offsets=(0, 0, 0.005), observed_value=1, offset_value=0)
-
-    # Copy tactile points
-    tactile_points, tactile_observations = \
-        _generate_gaussian_process_points(tactile_points, offsets=(0, 0, -0.005), observed_value=0, offset_value=1)
-
-    points = numpy.concatenate([depth_points, tactile_points], axis=0)
-    observations = numpy.concatenate([depth_observations, tactile_observations], axis=0)
-
-    return _gaussian_process_helper(points, observations, **kwargs)
-
-
 COMPLETION_METHODS = [
     delaunay_completion,
     marching_cubes_completion,
     qhull_completion,
-    gaussian_process_completion
 ]
-TACTILE_COMPLETION_METHODS = [delaunay_tactile_completion,
-                              marching_cubes_tactile_completion,
-                              qhull_tactile_completion,
-                              gaussian_process_tactile_completion]
+TACTILE_COMPLETION_METHODS = [
+    delaunay_tactile_completion,
+    marching_cubes_tactile_completion,
+    qhull_tactile_completion
+]

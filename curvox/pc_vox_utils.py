@@ -11,7 +11,7 @@ def get_voxel_resolution(pc, patch_size):
     For example if patch_size is 40, then we are determining the 
     side length of a single voxel in meters. Sovoxel_resolution
     may end up being something like 0.01 for a 1cm^3 voxel size
-jaccard_distance
+    jaccard_distance
     :type pc: numpy.ndarray
     :param pc: nx3 numpy array representing a pointcloud
 
