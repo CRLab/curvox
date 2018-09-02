@@ -1,13 +1,9 @@
 #!/usr/bin/env python
 
-import curvox.cloud_to_mesh_conversions
-import curvox.mesh_conversions
-import curvox.pc_vox_utils
 import binvox_rw
 import argparse
 import os
-import mcubes
-import numpy as np
+import skimage.measure
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +13,7 @@ from mpl_toolkits.mplot3d import Axes3D
 def parse_args():
     parser = argparse.ArgumentParser(description="Complete a single point cloud using specified completion method")
     parser.add_argument('binvox_filepath', type=str, help='binvox file to convert')
+    parser.add_argument('--resolution', type=int, default=40, help="resolution^3 voxels to display")
 
     args = parser.parse_args()
     return args
@@ -29,7 +26,10 @@ def main():
         print("File '{}' does not exist or is not a binvox file".format(args.binvox_filepath))
     binvox_data = binvox_rw.read_as_3d_array(open(args.binvox_filepath, 'r'))
 
-    voxels = binvox_data.data
+    print(binvox_data.data.shape)
+    scale_factor = binvox_data.dims[0] / args.resolution
+    voxels = skimage.measure.block_reduce(binvox_data.data, (scale_factor, scale_factor, scale_factor), np.max)
+    print("Voxel resolution '{}' reduced to '{}'".format(binvox_data.dims, voxels.shape))
 
     # set the colors of each object
     colors = np.empty(voxels.shape, dtype=object)
