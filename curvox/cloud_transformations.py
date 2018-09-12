@@ -104,6 +104,24 @@ def capture_cloud_and_transform(pc_topic, source_frame, target_frame):
     :rtype: pcl.PointCloud
     """
     pcl_pc = capture_cloud(pc_topic)
+
+    # Transform cloud into correct frame
+    tf_msg = capture_tf_msg(source_frame, target_frame)
+
+    cf2obj_tf_msg = tf_conversions.posemath.fromTf(tf_msg)
+    cf2obj_tf_mat = tf_conversions.posemath.toMatrix(cf2obj_tf_msg)
+
+    np_pc = pcl_pc.to_array()
+    np_pc = transform_cloud(np_pc, cf2obj_tf_mat)
+    np_pc = np_pc.astype(np.float32)
+
+    pcl_pc = pcl.PointCloud()
+    pcl_pc.from_array(np_pc)
+
+    return pcl_pc
+
+
+def capture_tf_msg(source_frame, target_frame):
     listener = tf.TransformListener()
 
     # Transform cloud into correct frame
@@ -113,15 +131,14 @@ def capture_cloud_and_transform(pc_topic, source_frame, target_frame):
         tf_msg = listener.lookupTransform(target_frame, source_frame, now)
     except tf2_ros.TransformException as e:
         rospy.logerr("Exception: {}, returning raw pointcloud".format(e))
-        return pcl_pc
+        raise e
 
-    cf2obj_tf_msg = tf_conversions.posemath.fromTf(tf_msg)
-    cf2obj_tf_mat = tf_conversions.posemath.toMatrix(cf2obj_tf_msg)
-    np_pc = pcl_pc.to_array()
-    np_pc = transform_cloud(np_pc, cf2obj_tf_mat)
-    np_pc = np_pc.astype(np.float32)
+    return tf_msg
 
-    pcl_pc = pcl.PointCloud()
-    pcl_pc.from_array(np_pc)
 
-    return pcl_pc
+def capture_tf_msg_np(source_frame, target_frame):
+    tf_msg = capture_tf_msg(source_frame, target_frame)
+    src2tgt_tf_msg = tf_conversions.posemath.fromTf(tf_msg)
+    src2tgt_tf_mat = tf_conversions.posemath.toMatrix(src2tgt_tf_msg)
+
+    return src2tgt_tf_mat
