@@ -2,14 +2,7 @@ import curvox.binvox_conversions
 import curvox.pc_vox_utils
 import curvox.cloud_transformations
 
-import tf_conversions
-import pcl
-import PyKDL
 import numpy as np
-import binvox_rw
-import math
-import os
-import numba
 
 
 def generate_tactile_points(gt_binvox, mesh_pose, patch_size, tactile_sample_count=40):
