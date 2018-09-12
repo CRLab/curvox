@@ -20,6 +20,7 @@ setup(name="curvox",
                'scripts/curvox_complete',
                'scripts/viewvox',
                'scripts/curvox_binvox_to_ply',
+               'scripts/capture_ros_pc',
                ],
       include_package_data=True,
       package_data={'curvox': ['bin/binvox']}

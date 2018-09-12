@@ -1,15 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import argparse
-import os
 import rospy
-import binvox_rw
-import sensor_msgs.msg
-import pcl
-import numpy as np
-import tf
-import tf_conversions.posemath
-
 import curvox.cloud_transformations
 
 
@@ -17,41 +9,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Capture a pointcloud from a ROS network and save it as a pcd file")
     parser.add_argument('pc_topic', type=str, help='ROS pointcloud topic')
     parser.add_argument('out_filename', type=str, help='Output filename')
-    parser.add_argument('--source_frame', type=str, default='camera_rgb_optical_frame', help='tf for cloud')
-    parser.add_argument('--target_frame', type=str, default='camera_rgb_optical_frame', help='dest tf for cloud')
+    parser.add_argument('--source_frame', type=str, default=None, help='tf for cloud')
+    parser.add_argument('--target_frame', type=str, default=None, help='dest tf for cloud')
     parser.add_argument('--as_binvox', action='store_true', help='Capture pointcloud as a binvox instead')
 
     args = parser.parse_args()
     return args
-
-
-def capture_pc_generator(subscriber, args):
-    def capture_pc(msg):
-        # type: (sensor_msgs.msg.PointCloud2) -> ()
-        np_pc = curvox.cloud_transformations.cloud_msg_to_np(msg)
-
-        # Transform cloud into correct frame
-        if args.source_frame != args.target_frame:
-            listener = tf.TransformListener()
-
-            now = rospy.Time(0)
-            listener.waitForTransform(args.target_frame, args.source_frame, now, rospy.Duration(5))
-            tf_msg = listener.lookupTransform(args.target_frame, args.source_frame, now)
-            cf2obj_tf_msg = tf_conversions.posemath.fromTf(tf_msg)
-            cf2obj_tf_mat = tf_conversions.posemath.toMatrix(cf2obj_tf_msg)
-            np_pc = curvox.cloud_transformations.transform_cloud(np_pc, cf2obj_tf_mat)
-
-        np_pc = np_pc.astype(np.float32)
-
-        pcl_pc = pcl.PointCloud()
-        pcl_pc.from_array(np_pc)
-
-        pcl_pc.to_file(args.out_filename)
-
-        subscriber[0].unregister()
-        rospy.signal_shutdown("done")
-
-    return capture_pc
 
 
 def main():
@@ -59,12 +22,16 @@ def main():
 
     rospy.init_node("pc_capture_node")
 
-    pc_capture_subscriber = [None]
-    pc_capture_subscriber[0] = rospy.Subscriber(args.pc_topic, sensor_msgs.msg.PointCloud2,
-                                                callback=capture_pc_generator(pc_capture_subscriber, args))
-
-    while not rospy.is_shutdown():
-        rospy.spin()
+    if args.source_frame and args.target_frame:
+        pcl_pc = curvox.cloud_transformations.capture_cloud_and_transform(
+            args.pc_topic,
+            args.source_frame,
+            args.target_frame
+        )
+    else:
+        pcl_pc = curvox.cloud_transformations.capture_cloud(args.pc_topic)
+    
+    pcl_pc.to_file(args.out_filename)
 
 
 if __name__ == "__main__":
