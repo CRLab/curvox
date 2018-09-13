@@ -92,6 +92,7 @@ def np_to_pcl(pc_np):
     :rtype pcl.PointCloud
     """
 
+    print(pc_np.shape)
     new_pcd = pcl.PointCloud(np.array(pc_np, np.float32))
     return new_pcd
 

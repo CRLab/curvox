@@ -293,3 +293,62 @@ def create_voxel_grid_around_point_scaled(
     voxel_grid[mask] = 1
 
     return voxel_grid
+
+
+def pc_to_binvox_for_shape_completion(points,
+                                      patch_size):
+    """
+    This function creates a binvox object from a pointcloud.  The voxel grid is slightly off center from the
+    pointcloud bbox center so that the back of the grid has more room for the completion.
+
+    :type points: numpy.ndarray
+    :param points: nx3 numpy array representing a pointcloud
+
+    :type patch_size: int
+    :param patch_size: how many voxels along a single dimension of the voxel grid.
+    Ex: patch_size=40 gives us a 40^3 voxel grid
+
+    :rtype: binvox_rw.Voxels
+
+    """
+
+    if points.shape[1] != 3:
+        raise Exception("Invalid pointcloud size, should be nx3, but is {}".format(points.shape))
+
+    # how much of the voxel grid do we want our pointcloud to fill.
+    # make this < 1 so that there is some padding on the edges
+    PERCENT_PATCH_SIZE = (4.0/5.0)
+
+    # Where should the center of the points be placed inside the voxel grid.
+    # normally make PERCENT_Z < 0.5 so that the points are placed towards the front of the grid
+    # this leaves more room for the shape completion to fill in the occluded back half of the occupancy grid.
+    PERCENT_X = 0.5
+    PERCENT_Y = 0.5
+    PERCENT_Z = 0.45
+
+    # get the center of the pointcloud in meters. Ex: center = np.array([0.2, 0.1, 2.0])
+    center = get_bbox_center(points)
+
+    # get the size of an individual voxel. Ex: voxel_resolution=0.01 meaning 1cm^3 voxel
+    # PERCENT_PATCH_SIZE determines how much extra padding to leave on the sides
+    voxel_resolution = get_voxel_resolution(points, PERCENT_PATCH_SIZE * patch_size)
+
+    # this tuple is where we want to stick the center of the pointcloud in our voxel grid
+    # Ex: (20, 20, 18) leaving some extra room in the back half.
+    pc_center_in_voxel_grid = (patch_size*PERCENT_X, patch_size*PERCENT_Y, patch_size*PERCENT_Z)
+
+    # create a voxel grid.
+    vox_np = voxelize_points(
+        points=points[:, 0:3],
+        pc_bbox_center=center,
+        voxel_resolution=voxel_resolution,
+        num_voxels_per_dim=patch_size,
+        pc_center_in_voxel_grid=pc_center_in_voxel_grid)
+
+    # location in meters of the bottom corner of the voxel grid in world space
+    offset = np.array(center) - np.array(pc_center_in_voxel_grid) * voxel_resolution
+
+    # create a voxel grid object to contain the grid, shape, offset in the world, and grid resolution
+    vox = binvox_rw.Voxels(vox_np, vox_np.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
+    return vox
+

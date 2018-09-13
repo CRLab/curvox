@@ -19,10 +19,10 @@ def cloud_msg_to_np(msg):
     """
 
     num_pts = msg.width*msg.height
-    out = np.zeros((num_pts, 4))
+    out = np.zeros((num_pts, 3))
     count = 0
     for point in sensor_msgs.point_cloud2.read_points(msg, skip_nans=False):
-        out[count] = point
+        out[count] = point[0:3]
         count += 1
 
     # if there were nans, we need to resize cloud to skip them.
