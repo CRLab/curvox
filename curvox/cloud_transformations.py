@@ -26,7 +26,7 @@ def cloud_msg_to_np(msg):
         count += 1
 
     # if there were nans, we need to resize cloud to skip them.
-    out = out[:count, 0:3]
+    out = out[:count, 0:3].astype(np.float32)
     return out
 
 
