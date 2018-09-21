@@ -2,8 +2,11 @@ import shape_msgs.msg
 import numpy
 import plyfile
 import geometry_msgs.msg
+import std_msgs.msg
 import copy
 import collada
+import sensor_msgs.point_cloud2
+import numpy as np
 
 
 def mesh_msg_to_dae(mesh_msg):
@@ -133,3 +136,18 @@ def transform_ply(ply, transform):
     transformed_ply['vertex']['z'] = transformed_mesh[2, :]
 
     return transformed_ply
+
+
+def ply_to_pointcloud_msg(ply, downsample=0, frame_id='/world'):
+    """
+    :type ply: plyfile.PlyData
+    :rtype sensor_msgs.msg.PointCloud2
+    """
+
+    points = [(vertex['x'], vertex['y'], vertex['z']) for vertex in ply.elements[0].data]
+
+    header = std_msgs.msg.Header()
+    header.frame_id = frame_id
+    pcl_arr = sensor_msgs.point_cloud2.create_cloud_xyz32(header, np.array(points))
+
+    return pcl_arr
