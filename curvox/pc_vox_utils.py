@@ -2,7 +2,6 @@ import numpy as np
 import binvox_rw
 import numba
 import mcubes
-import cloud_to_mesh_conversions
 
 
 @numba.jit
@@ -353,29 +352,4 @@ def pc_to_binvox_for_shape_completion(points,
     # create a voxel grid object to contain the grid, shape, offset in the world, and grid resolution
     vox = binvox_rw.Voxels(vox_np, vox_np.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
     return vox
-
-
-def binvox_to_ply(voxel_grid, **kwargs):
-    """
-
-    :param voxel_grid:
-    :type voxel_grid: binvox_rw.Voxels
-    :param kwargs:
-    :return:
-    """
-    percent_offset = kwargs.get("percent_offset", (0.5, 0.5, 0.45))
-    marching_cubes_resolution = kwargs.get("marching_cubes_resolution", 0.5)
-
-    patch_size = voxel_grid.dims[0]
-    pc_center_in_voxel_grid = (patch_size * percent_offset[0], patch_size * percent_offset[1], patch_size * percent_offset[2])
-    voxel_resolution = voxel_grid.scale / patch_size
-    center_point_in_voxel_grid = voxel_grid.translate + np.array(pc_center_in_voxel_grid) * voxel_resolution
-
-    vertices, faces = mcubes.marching_cubes(voxel_grid.data, marching_cubes_resolution)
-    vertices = vertices * voxel_resolution - np.array(pc_center_in_voxel_grid) * voxel_resolution + np.array(center_point_in_voxel_grid)
-
-    ply_data = cloud_to_mesh_conversions.generate_ply_data(vertices, faces)
-
-    # Export to plyfile type
-    return ply_data
 

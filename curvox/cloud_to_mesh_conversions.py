@@ -10,7 +10,54 @@ from curvox import pc_vox_utils
 import types
 
 
+# Binvox functions
+
+
+def binvox_to_ply(voxel_grid, **kwargs):
+    """
+
+    :param voxel_grid:
+    :type voxel_grid: binvox_rw.Voxels
+    :param kwargs:
+    :return:
+    """
+    percent_offset = kwargs.get("percent_offset", (0.5, 0.5, 0.45))
+    marching_cubes_resolution = kwargs.get("marching_cubes_resolution", 0.5)
+
+    patch_size = voxel_grid.dims[0]
+    pc_center_in_voxel_grid = (patch_size * percent_offset[0], patch_size * percent_offset[1], patch_size * percent_offset[2])
+    voxel_resolution = voxel_grid.scale / patch_size
+    center_point_in_voxel_grid = voxel_grid.translate + numpy.array(pc_center_in_voxel_grid) * voxel_resolution
+
+    vertices, faces = mcubes.marching_cubes(voxel_grid.data, marching_cubes_resolution)
+    vertices = vertices * voxel_resolution - numpy.array(pc_center_in_voxel_grid) * voxel_resolution + numpy.array(center_point_in_voxel_grid)
+
+    ply_data = generate_ply_data(vertices, faces)
+
+    # Export to plyfile type
+    return ply_data
+
+
 # Helper functions
+
+
+def generate_ply_data(points, faces):
+    """
+
+    :param points:
+    :param faces:
+    :return:
+    """
+    vertices = [(point[0], point[1], point[2]) for point in points]
+    faces = [(point,) for point in faces]
+
+    vertices_np = numpy.array(vertices, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    faces_np = numpy.array(faces, dtype=[('vertex_indices', 'i4', (3,))])
+
+    vertex_element = plyfile.PlyElement.describe(vertices_np, 'vertex')
+    face_element = plyfile.PlyElement.describe(faces_np, 'face')
+
+    return plyfile.PlyData([vertex_element, face_element], text=True)
 
 
 def smooth_ply(ply_data):
