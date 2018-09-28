@@ -14,7 +14,8 @@ $ wget http://www.patrickmin.com/binvox/linux64/binvox
 $ chmod a+x binvox
 $ mv binvox $HOME/.local/bin
 $ sudo apt install python-pytest
-$ pip2 install -e . --user --process-dependency-links
+$ pip2 install -r requirements.txt --user
+$ python2 setup.py install --user
 ```
 
 ## Tests
