@@ -353,3 +353,12 @@ def pc_to_binvox_for_shape_completion(points,
     vox = binvox_rw.Voxels(vox_np, vox_np.shape, tuple(offset), voxel_resolution * patch_size, "xyz")
     return vox
 
+
+@numba.jit
+def voxel_grid_jaccard_similarity(a, b):
+    '''
+    Returns the number of pixels of the intersection of two voxel grids divided
+    by the number of pixels in the union.
+    The inputs are expected to be numpy 5D ndarrays in BZCXY format.
+    '''
+    return np.mean(np.sum(a * b, axis=1) / np.sum((a + b) - a * b, axis=1))
