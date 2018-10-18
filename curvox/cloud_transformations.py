@@ -24,9 +24,9 @@ def cloud_msg_to_np(msg):
     pc = ros_numpy.numpify(msg)
     num_pts = reduce(operator.mul, pc.shape, 1)
     points = np.zeros((num_pts, 3))
-    points[:, 0] = pc['x'].reshape((num_pts))
-    points[:, 1] = pc['y'].reshape((num_pts))
-    points[:, 2] = pc['z'].reshape((num_pts))
+    points[:, 0] = pc['x'].reshape(num_pts)
+    points[:, 1] = pc['y'].reshape(num_pts)
+    points[:, 2] = pc['z'].reshape(num_pts)
 
     return np.array(points, dtype=np.float32)
 
