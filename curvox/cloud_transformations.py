@@ -7,8 +7,12 @@ import std_msgs.msg
 import rospy
 import numpy as np
 import pcl
+import numba
+import ros_numpy
+import operator
 
 
+@numba.jit
 def cloud_msg_to_np(msg):
     """
     Take a ros pointclud message and convert it to
@@ -17,17 +21,14 @@ def cloud_msg_to_np(msg):
     :type msg: sensor_msg.msg.PointCloud2
     :rtype numpy.ndarray
     """
+    pc = ros_numpy.numpify(msg)
+    num_pts = reduce(operator.mul, pc.shape, 1)
+    points = np.zeros((num_pts, 3))
+    points[:, 0] = pc['x'].reshape((num_pts))
+    points[:, 1] = pc['y'].reshape((num_pts))
+    points[:, 2] = pc['z'].reshape((num_pts))
 
-    num_pts = msg.width*msg.height
-    out = np.zeros((num_pts, 3))
-    count = 0
-    for point in sensor_msgs.point_cloud2.read_points(msg, skip_nans=False):
-        out[count] = point[0:3]
-        count += 1
-
-    # if there were nans, we need to resize cloud to skip them.
-    out = out[:count, 0:3].astype(np.float32)
-    return out
+    return np.array(points, dtype=np.float32)
 
 
 def np_to_cloud_msg(pc_np, frame_id):
@@ -45,6 +46,7 @@ def np_to_cloud_msg(pc_np, frame_id):
     return cloud_msg
 
 
+@numba.jit
 def transform_cloud(pc, transform):
     """
     :type pc: numpy.ndarray

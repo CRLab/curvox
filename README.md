@@ -24,3 +24,7 @@ A few tests have been written in the `tests` folder. In order to run the test su
 $ cd tests
 $ py.test
 ```
+
+## Dependencies
+
+- [ros_numpy](https://github.com/eric-wieser/ros_numpy)
