@@ -1,15 +1,17 @@
-import sensor_msgs.msg
-import sensor_msgs.point_cloud2
-import tf
-import tf_conversions
-import tf2_ros
-import std_msgs.msg
-import rospy
+import operator
+
+import numba
 import numpy as np
 import pcl
-import numba
+
 import ros_numpy
-import operator
+import rospy
+import sensor_msgs.msg
+import sensor_msgs.point_cloud2
+import std_msgs.msg
+import tf
+import tf2_ros
+import tf_conversions
 
 
 @numba.jit
@@ -33,6 +35,8 @@ def cloud_msg_to_np(msg):
 
 def np_to_cloud_msg(pc_np, frame_id):
     """
+    :param frame_id:
+    :type frame_id: str
     :type pc_np: numpy.ndarray
     :param pc_np: A nx3 pointcloud
     :rtype sensor_msg.msg.PointCloud2
@@ -41,6 +45,16 @@ def np_to_cloud_msg(pc_np, frame_id):
     header = std_msgs.msg.Header()
     header.stamp = rospy.Time.now()
     header.frame_id = frame_id
+    # data = np.zeros(pc_np.shape[0], dtype=[
+    #     ('x', np.float32),
+    #     ('y', np.float32),
+    #     ('vectors', np.float32, (3,))
+    # ])
+    # data['x'] = np.arange(100)
+    # data['y'] = data['x'] * 2
+    # data['vectors'] = np.arange(100)[:, np.newaxis]
+    #
+    # msg = ros_numpy.msgify(PointCloud2, data)
     cloud_msg = sensor_msgs.point_cloud2.create_cloud_xyz32(header, pc_np)
 
     return cloud_msg

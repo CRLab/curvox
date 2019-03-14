@@ -2,7 +2,7 @@
 
 import argparse
 import rospy
-import curvox.cloud_transformations
+from src import curvox
 
 
 def parse_args():

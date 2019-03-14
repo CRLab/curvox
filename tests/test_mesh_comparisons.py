@@ -1,5 +1,5 @@
-import curvox.mesh_comparisons
-from curvox.utils import time_fn
+from src import curvox
+from curvox import time_fn
 
 meshfilename1 = 'resources/unsmoothed.ply'
 meshfilename2 = 'resources/smoothed.ply'

@@ -1,7 +1,7 @@
-from curvox.cloud_to_mesh_conversions import \
+from curvox import \
     delaunay_completion, marching_cubes_completion, qhull_completion, gaussian_process_completion, \
     delaunay_tactile_completion, marching_cubes_tactile_completion, qhull_tactile_completion, gaussian_process_tactile_completion
-from curvox.utils import time_fn
+from curvox import time_fn
 import pcl
 
 

@@ -23,5 +23,6 @@ setup(name="curvox",
                'scripts/capture_ros_pc',
                ],
       include_package_data=True,
+      package_dir={'': 'src'},
       package_data={'curvox': ['bin/binvox']}
-)
+      )

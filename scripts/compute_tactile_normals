@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import pcl
 import argparse
-import curvox.cloud_conversions
+from src import curvox
 
 if __name__ == "__main__":
 

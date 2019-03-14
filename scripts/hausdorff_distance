@@ -1,6 +1,6 @@
 #!usr/bin/env python
 
-import curvox.mesh_comparisons
+from src import curvox
 import argparse
 
 if __name__ == "__main__":
