@@ -7,7 +7,7 @@ def time_fn(fn, *args, **kwargs):
     results = fn(*args, **kwargs)
     end = time.clock()
     fn_name = fn.__module__ + "." + fn.__name__
-    print fn_name + ": " + str(end - start) + "s"
+    print(fn_name + ": " + str(end - start) + "s")
     return results
 
 
@@ -66,12 +66,9 @@ def copytree(src, dst, symlinks=False, ignore=None):
             else:
                 copyfile(srcname, dstname)
             # XXX What about devices, sockets etc.?
-        except (IOError, os.error), why:
+        except (IOError, os.error) as why:
             errors.append((srcname, dstname, str(why)))
-        except CTError, err:
+        except CTError as err:
             errors.extend(err.errors)
     if errors:
         raise CTError(errors)
-
-
-

@@ -12,19 +12,20 @@ import std_msgs.msg
 import tf
 import tf2_ros
 import tf_conversions
+import functools
 
 
 @numba.jit
 def cloud_msg_to_np(msg):
     """
     Take a ros pointclud message and convert it to
-    an nx3 numpy ndarray.
+    an nx3 np ndarray.
 
     :type msg: sensor_msg.msg.PointCloud2
-    :rtype numpy.ndarray
+    :rtype np.ndarray
     """
     pc = ros_numpy.numpify(msg)
-    num_pts = reduce(operator.mul, pc.shape, 1)
+    num_pts = functools.reduce(operator.mul, pc.shape, 1)
     points = np.zeros((num_pts, 3))
     points[:, 0] = pc['x'].reshape(num_pts)
     points[:, 1] = pc['y'].reshape(num_pts)
@@ -37,7 +38,7 @@ def np_to_cloud_msg(pc_np, frame_id):
     """
     :param frame_id:
     :type frame_id: str
-    :type pc_np: numpy.ndarray
+    :type pc_np: np.ndarray
     :param pc_np: A nx3 pointcloud
     :rtype sensor_msg.msg.PointCloud2
     """
@@ -63,11 +64,11 @@ def np_to_cloud_msg(pc_np, frame_id):
 @numba.jit
 def transform_cloud(pc, transform):
     """
-    :type pc: numpy.ndarray
-    :type transform: numpy.ndarray
+    :type pc: np.ndarray
+    :type transform: np.ndarray
     :param transform: A 4x4 homogenous transform to apply to the cloud
     :param pc: A nx3 pointcloud
-    :rtype numpy.ndarray
+    :rtype np.ndarray
     """
 
     if len(pc.shape) != 2:

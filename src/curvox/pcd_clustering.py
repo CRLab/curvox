@@ -1,4 +1,4 @@
-import cPickle
+import pickle
 import ctypes
 import os
 import random
@@ -14,52 +14,51 @@ def point_inline_check(x, y, image_width, image_height):
     return 0 < x < image_height - 1 and 0 < y < image_width - 1
 
 
-def find_table(
-        cloud  # type: pcl.PointCloud
-):
-    seg = cloud.make_segmenter()
-    # Optional
-    seg.set_optimize_coefficients(True)
-    # Mandatory
-    seg.set_model_type(pcl.SACMODEL_PLANE)
-    seg.set_method_type(pcl.SAC_RANSAC)
-    seg.set_distance_threshold(0.1)
-    # seg.set_max_iterations(1000)
-
+def find_table(cloud, min_distance=10000.0, distance_threshold=0.05):
+    """
+    :param cloud: Input scene cloud
+    :type cloud: pcl.PointCloud
+    :param min_distance: Minimum distance from camera to plane
+    :type min_distance: float
+    :param distance_threshold: Distance from camera frame threshold
+    :type distance_threshold: float
+    :return: Pointcloud of table in input cloud. Returns an empty cloud if no table was found
+    :rtype: pcl.PointCloud
+    """
+    # the total number of points in the cloud
     nr_points = cloud.size
-    min_distance = 10000.0
-    # table_pcd = np.empty()
 
-    inliers, model = seg.segment()
+    table = pcl.PointCloud()
 
-    print(inliers)
-    print(model)
+    # loop through the pointcloud and get the planes iteratively
+    while cloud.size > 0.3 * nr_points:
+        # not sure why normals here
+        # seg = cloud.make_segmenter_normals()
+        seg = cloud.make_segmenter()
+        # Optional
+        seg.set_optimize_coefficients(True)
+        # Mandatory
+        seg.set_model_type(pcl.SACMODEL_PLANE)
+        seg.set_method_type(pcl.SAC_RANSAC)
+        # seg.set_max_iterations(1000)
+        seg.set_distance_threshold(distance_threshold)
+        indices, model = seg.segment()
+        if len(indices) == 0:
+            print("Could not estimate a planar model for the given dataset.")
+            exit(0)
+        cloud_plane = cloud.extract(indices, bool_negative=False)
+        cp_matrix = np.asarray(cloud_plane)
 
-    # while cloud
+        # calculate the norm for all the points and get the smallest one (i.e shortest distance)
+        temp_min_distance = np.amin(np.linalg.norm(cp_matrix, axis=1))
+        if temp_min_distance < min_distance:
+            table = cloud_plane
+            min_distance = temp_min_distance
 
-    import IPython
-    IPython.embed()
+        # extract out the rest of the points
+        cloud = cloud.extract(indices, bool_negative=True)
 
-
-def find_table_plane(pcd):
-    lib = np.ctypeslib.load_library("table_finder/testlib", ".")
-    array_1d_double = np.ctypeslib.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS')
-    out = np.zeros(500000)
-    pcd_arr = np.ones((pcd.shape[0] * 3))
-    pcd_arr[0:pcd.shape[0]] = pcd[:, 0]
-    pcd_arr[pcd.shape[0]:pcd.shape[0] * 2] = pcd[:, 1]
-    pcd_arr[2 * pcd.shape[0]:3 * pcd.shape[0]] = pcd[:, 2]
-
-    lib.add_one.restype = ctypes.c_int
-    lib.add_one.argtypes = [array_1d_double, ctypes.c_int, ctypes.c_int, array_1d_double]
-    num_idx = lib.add_one(pcd_arr, pcd.shape[0], 3, out)
-
-    res_out = np.zeros((num_idx, 3))
-    res_out[:, 0] = out[0:num_idx]
-    res_out[:, 1] = out[num_idx:2 * num_idx]
-    res_out[:, 2] = out[2 * num_idx:3 * num_idx]
-
-    return res_out
+    return table
 
 
 def scan_line(mask, target_idx, seed_coord, image_width, image_height):
@@ -78,7 +77,8 @@ def scan_line(mask, target_idx, seed_coord, image_width, image_height):
         span_above = span_below = False
         while point_inline_check(x1, y) and mask_cp[x1, y] == seed_idx:
             mask_cp[x1, y] = target_idx
-            if not span_above and point_inline_check(x1, y, image_width, image_height) and mask_cp[x1, y - 1] == seed_idx:
+            if not span_above and point_inline_check(x1, y, image_width, image_height) and mask_cp[
+                x1, y - 1] == seed_idx:
                 # print "append"
                 stack.append((x1, y - 1))
                 span_above = True
@@ -86,7 +86,8 @@ def scan_line(mask, target_idx, seed_coord, image_width, image_height):
                 # print "no append"
                 span_above = False
 
-            if not span_below and point_inline_check(x1, y, image_width, image_height) and mask_cp[x1, y + 1] == seed_idx:
+            if not span_below and point_inline_check(x1, y, image_width, image_height) and mask_cp[
+                x1, y + 1] == seed_idx:
                 # print "append"
                 stack.append((x1, y + 1))
                 span_below = True
@@ -111,7 +112,7 @@ def search_around_point(idx_list, mask, image_width, image_height):
 
 def validate_bg_points(idx_0_table_mask, table_mask, table_full_mask, image_width, image_height):
     idx_0_table_mask_ls = []
-    for i in xrange(idx_0_table_mask[0].shape[0]):
+    for i in range(idx_0_table_mask[0].shape[0]):
         x = idx_0_table_mask[0][i]
         y = idx_0_table_mask[1][i]
         if (1 in table_mask[0:x, y] or 2 in table_mask[0:x, y]) and \
@@ -144,7 +145,7 @@ def clustering_2d(cam_model, table_mask, table_top_pcd):
 def clean_tabletop_pcd(cam_model, table_mask, tabletop_pcd):
     tabletop_pcd_clean = np.zeros(tabletop_pcd.shape)
     index = 0
-    for i in xrange(tabletop_pcd.shape[0]):
+    for i in range(tabletop_pcd.shape[0]):
         coord_2d = cam_model.project_3d_to_2d(tabletop_pcd[i, :])
         coord_2d = list(coord_2d)
         coord_2d[0] = int(round(coord_2d[0]))
@@ -203,16 +204,16 @@ def show_3d_plot(pcd):
 
 
 def pcd_max_min_dist_viewer(pcd):
-    print "min x, max x: ", np.min(pcd[:, 0]), np.max(pcd[:, 0])
-    print "min y, max y: ", np.min(pcd[:, 1]), np.max(pcd[:, 1])
-    print "min z, max z: ", np.min(pcd[:, 2]), np.max(pcd[:, 2])
-    print "min distance, max distance: ", np.min(np.square(pcd[:, 0]) + np.square(pcd[:, 1]) + np.square(pcd[:, 2])), \
-        np.max(np.square(pcd[:, 0]) + np.square(pcd[:, 1]) + np.square(pcd[:, 2]))
+    print("min x, max x: ", np.min(pcd[:, 0]), np.max(pcd[:, 0]))
+    print("min y, max y: ", np.min(pcd[:, 1]), np.max(pcd[:, 1]))
+    print("min z, max z: ", np.min(pcd[:, 2]), np.max(pcd[:, 2]))
+    print("min distance, max distance: ", np.min(np.square(pcd[:, 0]) + np.square(pcd[:, 1]) + np.square(pcd[:, 2])),
+          np.max(np.square(pcd[:, 0]) + np.square(pcd[:, 1]) + np.square(pcd[:, 2])))
 
 
 class Transformer:
-    def __init__(self, camera_info, image_width, image_height, fx=0, fy=0, cx=0, cy=0, camera_info_object=None):
-        if camera_info:
+    def __init__(self, image_width, image_height, fx=0, fy=0, cx=0, cy=0, camera_info_object=None):
+        if camera_info_object:
             self.fx = int(camera_info_object.K[0])
             self.fy = int(camera_info_object.K[4])
             self.cx = int(camera_info_object.K[2])
@@ -228,7 +229,7 @@ class Transformer:
 
     def pcl_to_2dcoord(self, pcd):
         mask = np.zeros((self.image_height, self.image_width))
-        for i in xrange(pcd.shape[0]):
+        for i in range(pcd.shape[0]):
             xy = self.project_3d_to_2d(pcd[i, :])
             mask[xy[1], xy[0]] = 1
         return mask
@@ -281,7 +282,7 @@ def find_normal_vector(pcd):
     max_itr = 20
     test_vector = np.zeros((3, 1))
 
-    for itr in xrange(0, max_itr):
+    for _ in range(0, max_itr):
         idx = random.sample(range(0, rows), 3)
         point1 = pcd[idx[0], :]
         point2 = pcd[idx[1], :]
@@ -308,62 +309,25 @@ def pcl_above_plane(plane_pcl, all_pcl):
 
     normal_vector = find_normal_vector(plane_pcl)
 
-    for i in xrange(all_pcl.shape[0]):
+    for i in range(all_pcl.shape[0]):
         if np.dot(normal_vector, all_pcl[i, :] - anchor_point) > 0:
             roi_pcl[index, :] = all_pcl[i, :]
             index += 1
     return roi_pcl[:index, :]
 
 
-def pcl_clustering(pcd, image_width, image_height, clustering_dim='3D', **kwargs):
-    if ("fx" in kwargs and "fy" in kwargs and "cx" in kwargs and "cy" in kwargs and "camera_info" in kwargs) or \
-       ("camera_info" in kwargs and "camera_info_object" in kwargs):
+def pcl_clustering(pcd, image_width, image_height, clustering_dim='3D', distance_threshold=0.05, **kwargs):
+    if ("fx" in kwargs and "fy" in kwargs and "cx" in kwargs and "cy" in kwargs) or ("camera_info_object" in kwargs):
         camera_model = Transformer(image_width, image_height, **kwargs)
     else:
-        raise ValueError("Keyword arguments must be (fx, fy, cx, cy, camera_info) or (camera_info, camera_info_object)")
+        raise ValueError("Keyword arguments must be (fx, fy, cx, cy) or (camera_info_object)")
 
-    table_pcd = find_table_plane(pcd)
-    table_top_pcd = pcl_above_plane(table_pcd, pcd)
-    table_mask = camera_model.pcl_to_2dcoord(table_pcd)
+    table_pcd = find_table(pcd, distance_threshold=distance_threshold)
+    table_np = table_pcd.to_array()
+    table_top_pcd = pcl_above_plane(table_np, pcd)
+    table_mask = camera_model.pcl_to_2dcoord(table_np)
 
     if clustering_dim == '2D':  # not available yet
         return clustering_2d(camera_model, table_mask, table_top_pcd)
     if clustering_dim == '3D':
         return clustering_3d(camera_model, table_mask, table_top_pcd)
-
-
-def __main():
-    camera_info = True  # True if you use camInfo object, False if you use fx,fy, cx,cy
-    input_example_path_base = './example/input/'
-    output_example_path_base = './example/output/'
-
-    pcd_path_input = os.path.join(input_example_path_base, 'example_pcl.pcd')
-    camera_info_path_output = os.path.join(input_example_path_base, 'example_pkl.pkl')
-
-    image_width = 640
-    image_height = 480
-
-    p = pcl.PointCloud()
-    p.from_file(pcd_path_input)
-    input_pcd = p.to_array()
-    input_pcd = input_pcd[~np.isnan(input_pcd[:, 2]), :]
-
-    with open(camera_info_path_output, 'rb') as f:
-        camera_info_object = cPickle.load(f)
-
-    if camera_info:
-        output = pcl_clustering(input_pcd, image_width, image_height, camera_info_object=camera_info_object,
-                                camera_info=camera_info)
-    else:
-        output = pcl_clustering(input_pcd, image_width, image_height, fx=int(camera_info_object.K[0]),
-                                fy=int(camera_info_object.K[4]), cx=int(camera_info_object.K[2]),
-                                cy=int(camera_info_object.K[5]), camera_info=camera_info)
-
-    for i in xrange(len(output)):
-        pcd_path_output = os.path.join(output_example_path_base, 'example_pcl_output_{:02d}.pcd'.format(i))
-        p.from_array(output[i].astype(np.float32))
-        p.to_file(pcd_path_output)
-
-
-if __name__ == "__main__":
-    __main()
