@@ -7,6 +7,7 @@ import copy
 import collada
 import sensor_msgs.point_cloud2
 import numpy as np
+import pcl
 
 
 def mesh_msg_to_dae(mesh_msg):
@@ -138,7 +139,7 @@ def transform_ply(ply, transform):
     return transformed_ply
 
 
-def ply_to_pointcloud_msg(ply, downsample=0, frame_id='/world'):
+def ply_to_pointcloud_msg(ply, frame_id='/world'):
     """
     :type ply: plyfile.PlyData
     :rtype sensor_msgs.msg.PointCloud2
@@ -151,3 +152,28 @@ def ply_to_pointcloud_msg(ply, downsample=0, frame_id='/world'):
     pcl_arr = sensor_msgs.point_cloud2.create_cloud_xyz32(header, np.array(points))
 
     return pcl_arr
+
+
+def ply_to_pcl(ply):
+    """
+    :type ply: plyfile.PlyData
+    :rtype sensor_msgs.msg.PointCloud2
+    """
+
+    points = np.array([(vertex['x'], vertex['y'], vertex['z']) for vertex in ply.elements[0].data])
+
+    out_pc = pcl.PointCloud()
+    out_pc.from_array(points)
+
+    return out_pc
+
+
+def ply_to_np(ply):
+    """
+    :type ply: plyfile.PlyData
+    :rtype sensor_msgs.msg.PointCloud2
+    """
+
+    points = np.array([(vertex['x'], vertex['y'], vertex['z']) for vertex in ply.elements[0].data])
+
+    return points

@@ -219,7 +219,7 @@ def pcd_max_min_dist_viewer(pcd):
           np.max(np.square(pcd[:, 0]) + np.square(pcd[:, 1]) + np.square(pcd[:, 2])))
 
 
-class Transformer:
+class Transformer(object):
     def __init__(self, image_width, image_height, fx=0, fy=0, cx=0, cy=0, camera_info_object=None):
         if camera_info_object:
             self.fx = int(camera_info_object.K[0])
