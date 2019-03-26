@@ -27,24 +27,24 @@ def parse_args():
 def main():
     args = parse_args()
 
-    p = pcl.PointCloud()
-    p.from_file(args.input_pcd_filepath)
-    input_pcd = p.to_array()
-    input_pcd = input_pcd[~np.isnan(input_pcd[:, 2]), :]
+    input_cloud = pcl.load(args.input_pcd_filepath)
 
     # Primesense Carmine 1.09 Intrinsics: width/height/fx/fy/cx/cy [640 | 480 | 540.994 | 540.994 | 320.000 | 240.000]
-    output = curvox.pcd_clustering.pcl_clustering(
-        input_pcd,
+    clusters, table_pcd = curvox.pcd_clustering.pcl_clustering(
+        input_cloud,
         distance_threshold=args.distance_threshold,
         image_width=args.image_width,
         image_height=args.image_height,
         fx=args.fx, fy=args.fy, cx=args.cx, cy=args.cy
     )
 
-    for cluster_index in range(len(output)):
+    out_cloud = pcl.PointCloud()
+    for cluster_index in range(len(clusters)):
         pcd_path_output = args.out_filepath.replace(".pcd", '{}.pcd'.format(cluster_index))
-        p.from_array(output[cluster_index].astype(np.float32))
-        p.to_file(pcd_path_output)
+        out_cloud.from_array(clusters[cluster_index].astype(np.float32))
+        pcl.save(out_cloud, pcd_path_output, binary=True)
+
+    pcl.save(table_pcd, args.out_filepath.replace(".pcd", "table.pcd"), binary=True)
 
 
 if __name__ == "__main__":

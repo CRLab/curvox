@@ -1,5 +1,4 @@
-import pickle
-import ctypes
+import numba
 import os
 import random
 
@@ -10,6 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import DBSCAN
 
 
+@numba.jit
 def point_inline_check(x, y, image_width, image_height):
     return 0 < x < image_height - 1 and 0 < y < image_width - 1
 
@@ -46,7 +46,7 @@ def find_table(cloud, min_distance=10000.0, distance_threshold=0.05):
         if len(indices) == 0:
             print("Could not estimate a planar model for the given dataset.")
             exit(0)
-        cloud_plane = cloud.extract(indices, bool_negative=False)
+        cloud_plane = cloud.extract(indices, negative=False)
         cp_matrix = np.asarray(cloud_plane)
 
         # calculate the norm for all the points and get the smallest one (i.e shortest distance)
@@ -56,11 +56,12 @@ def find_table(cloud, min_distance=10000.0, distance_threshold=0.05):
             min_distance = temp_min_distance
 
         # extract out the rest of the points
-        cloud = cloud.extract(indices, bool_negative=True)
+        cloud = cloud.extract(indices, negative=True)
 
     return table
 
 
+@numba.jit
 def scan_line(mask, target_idx, seed_coord, image_width, image_height):
     seed_idx = 0
     mask_cp = np.copy(mask)
@@ -99,6 +100,7 @@ def scan_line(mask, target_idx, seed_coord, image_width, image_height):
     return mask_cp
 
 
+@numba.jit
 def search_around_point(idx_list, mask, image_width, image_height):
     mask_updated = np.copy(mask)
     fill_idx = 3
@@ -110,6 +112,7 @@ def search_around_point(idx_list, mask, image_width, image_height):
     return mask_updated, fill_idx
 
 
+@numba.jit
 def validate_bg_points(idx_0_table_mask, table_mask, table_full_mask, image_width, image_height):
     idx_0_table_mask_ls = []
     for i in range(idx_0_table_mask[0].shape[0]):
@@ -142,14 +145,15 @@ def clustering_2d(cam_model, table_mask, table_top_pcd):
     # return search_around_point(idx_0_table_mask_ls, table_mask)
 
 
+@numba.jit
 def clean_tabletop_pcd(cam_model, table_mask, tabletop_pcd):
     tabletop_pcd_clean = np.zeros(tabletop_pcd.shape)
     index = 0
     for i in range(tabletop_pcd.shape[0]):
         coord_2d = cam_model.project_3d_to_2d(tabletop_pcd[i, :])
         coord_2d = list(coord_2d)
-        coord_2d[0] = int(round(coord_2d[0]))
-        coord_2d[1] = int(round(coord_2d[1]))
+        coord_2d[0] = int(round(coord_2d[0])) - 1
+        coord_2d[1] = int(round(coord_2d[1])) - 1
         if table_mask[coord_2d[1], coord_2d[0]] == 0:
             tabletop_pcd_clean[index, :] = tabletop_pcd[i, :]
             index += 1
@@ -157,10 +161,12 @@ def clean_tabletop_pcd(cam_model, table_mask, tabletop_pcd):
     return tabletop_pcd_clean[:index, :]
 
 
+@numba.jit
 def density_clustering(table_top_pcd_clean):
     return DBSCAN(eps=0.1, min_samples=1000).fit(table_top_pcd_clean)
 
 
+@numba.jit
 def seg_pcl_from_labels(cluster_labels, table_top_pcd_clean):
     obj_3d = []
     for i in range(np.unique(cluster_labels).shape[0] - 1):
@@ -172,6 +178,7 @@ def seg_pcl_from_labels(cluster_labels, table_top_pcd_clean):
     return obj_3d
 
 
+@numba.jit
 def clustering_3d(cam_model, table_mask, table_top_pcd):
     table_top_pcd_clean = clean_tabletop_pcd(cam_model, table_mask, table_top_pcd)
 
@@ -181,6 +188,7 @@ def clustering_3d(cam_model, table_mask, table_top_pcd):
     return obj_pcl
 
 
+@numba.jit
 def show_img_with_mask(img, mask):
     img[:, :, 0] = np.multiply(img[:, :, 0], mask)
     img[:, :, 1] = np.multiply(img[:, :, 1], mask)
@@ -227,6 +235,7 @@ class Transformer:
         self.image_height = image_height
         self.image_width = image_width
 
+    @numba.jit
     def pcl_to_2dcoord(self, pcd):
         mask = np.zeros((self.image_height, self.image_width))
         for i in range(pcd.shape[0]):
@@ -234,6 +243,7 @@ class Transformer:
             mask[xy[1], xy[0]] = 1
         return mask
 
+    @numba.jit
     def pixel_to_pcl(self, uv_pixel):
         unit_pcl = np.zeros((len(uv_pixel), 3))
 
@@ -241,11 +251,13 @@ class Transformer:
             unit_pcl[key, :] = self.project_2d_to_3d(pixel)
         return unit_pcl
 
+    @numba.jit
     def project_3d_to_2d(self, pt):
         x = int((self.fx * pt[0]) / pt[2] + self.cx)
         y = int((self.fy * pt[1]) / pt[2] + self.cy)
         return x, y
 
+    @numba.jit
     def project_2d_to_3d(self, px):
         unit_pcl = np.zeros(3)
         unit_pcl[0] = (px[0] - self.cx) / self.fx
@@ -261,6 +273,7 @@ def save_pcl(pcd, name):
     pc.to_file(name)
 
 
+@numba.jit
 def table_plane_pcl(p, path):
     table_pcd = []
     min_distance = 10000000000000
@@ -276,6 +289,7 @@ def table_plane_pcl(p, path):
     return table_pcd
 
 
+@numba.jit
 def find_normal_vector(pcd):
     rows = pcd.shape[0]
     normal_vector = 0
@@ -301,6 +315,7 @@ def find_normal_vector(pcd):
         return normal_vector / max_itr
 
 
+@numba.jit
 def pcl_above_plane(plane_pcl, all_pcl):
     anchor_point = np.mean(plane_pcl, axis=0)
 
@@ -316,18 +331,50 @@ def pcl_above_plane(plane_pcl, all_pcl):
     return roi_pcl[:index, :]
 
 
-def pcl_clustering(pcd, image_width, image_height, clustering_dim='3D', distance_threshold=0.05, **kwargs):
+@numba.jit
+def pcd_filter(input_cloud, x_min, x_max, y_min, y_max, z_min, z_max):
+    if isinstance(input_cloud, pcl.PointCloud):
+        cloud_np = input_cloud.to_array()
+    elif isinstance(input_cloud, np.ndarray):
+        cloud_np = input_cloud
+    else:
+        raise ValueError("input_cloud must be pcl.PointCloud or np.ndarray")
+
+    ll = np.array([x_min, y_min, z_min])  # lower-left
+    ur = np.array([x_max, y_max, z_max])  # upper-right
+
+    inidx = np.all(np.logical_and(ll <= cloud_np, cloud_np <= ur), axis=1)
+    inner_points = cloud_np[inidx]
+    # outbox = pts[np.logical_not(inidx)]
+
+    out_cloud = pcl.PointCloud()
+    out_cloud.from_array(inner_points)
+    return out_cloud
+
+
+def pcl_clustering(input_cloud, image_width, image_height, clustering_dim='3D', distance_threshold=0.05, **kwargs):
+    """
+
+    :param input_cloud:
+    :param image_width:
+    :param image_height:
+    :param clustering_dim:
+    :param distance_threshold:
+    :param kwargs:
+    :return:
+    """
     if ("fx" in kwargs and "fy" in kwargs and "cx" in kwargs and "cy" in kwargs) or ("camera_info_object" in kwargs):
         camera_model = Transformer(image_width, image_height, **kwargs)
     else:
         raise ValueError("Keyword arguments must be (fx, fy, cx, cy) or (camera_info_object)")
 
-    table_pcd = find_table(pcd, distance_threshold=distance_threshold)
+    table_pcd = find_table(input_cloud, distance_threshold=distance_threshold)
     table_np = table_pcd.to_array()
-    table_top_pcd = pcl_above_plane(table_np, pcd)
+    input_cloud_np = input_cloud.to_array()
+    table_top_pcd = pcl_above_plane(table_np, input_cloud_np)
     table_mask = camera_model.pcl_to_2dcoord(table_np)
 
     if clustering_dim == '2D':  # not available yet
-        return clustering_2d(camera_model, table_mask, table_top_pcd)
+        return clustering_2d(camera_model, table_mask, table_top_pcd), table_pcd
     if clustering_dim == '3D':
-        return clustering_3d(camera_model, table_mask, table_top_pcd)
+        return clustering_3d(camera_model, table_mask, table_top_pcd), table_pcd

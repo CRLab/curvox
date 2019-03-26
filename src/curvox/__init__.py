@@ -1,15 +1,29 @@
+__all__ = [
+    'cloud_transformations',
+    'mesh_conversions',
+    'simulate_tactile_collection',
+    'binvox_conversions',
+    'cloud_conversions',
+    'cloud_to_mesh_conversions',
+    'mesh_comparisons',
+    'pc_vox_utils',
+    'pcd_clustering',
+    'utils',
+]
+
 try:
-    import cloud_transformations
-    import mesh_conversions
-    import simulate_tactile_collection
+    from curvox import cloud_transformations
+    from curvox import mesh_conversions
+    from curvox import simulate_tactile_collection
 except ImportError:
     # ROS is not on the python path
     pass
 
-import binvox_conversions
-import cloud_conversions
-import cloud_to_mesh_conversions
-import mesh_comparisons
-import pc_vox_utils
-import pcd_clustering
-import utils
+from curvox import binvox_conversions
+from curvox import cloud_conversions
+from curvox import cloud_to_mesh_conversions
+from curvox import mesh_comparisons
+from curvox import pc_vox_utils
+from curvox import pcd_clustering
+from curvox import utils
+

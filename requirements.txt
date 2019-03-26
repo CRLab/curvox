@@ -7,6 +7,7 @@ pymcubes
 pyhull
 pytest
 numba
+cython
 pycollada
 scikit-learn
 -e git://github.com/crlab/binvox-rw-py.git#egg=binvox-rw

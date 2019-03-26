@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+
+import argparse
+
+import numpy as np
+import pcl
+
+import curvox
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Filter a pointcloud")
+    parser.add_argument('input_pcd_filepath', type=str, help='pcd file to find clusters for')
+    parser.add_argument('out_filepath', type=str, default='filtered.pcd', help='Output filename')
+    parser.add_argument('x_min', type=float, default=-np.inf)
+    parser.add_argument('x_max', type=float, default=np.inf)
+    parser.add_argument('y_min', type=float, default=-np.inf)
+    parser.add_argument('y_max', type=float, default=np.inf)
+    parser.add_argument('z_min', type=float, default=-np.inf)
+    parser.add_argument('z_max', type=float, default=np.inf)
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
+
+    input_cloud = pcl.load(args.input_pcd_filepath)
+
+    filtered_cloud = curvox.pcd_clustering.pcd_filter(
+        input_cloud, args.x_min, args.x_max, args.y_min, args.y_max, args.z_min, args.z_max)
+
+    pcl.save(filtered_cloud, args.out_filepath)
+
+
+if __name__ == "__main__":
+    main()
