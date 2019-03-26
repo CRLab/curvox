@@ -1,4 +1,4 @@
-from src import curvox
+import curvox
 from curvox import time_fn
 
 meshfilename1 = 'resources/unsmoothed.ply'

@@ -2,7 +2,7 @@
 
 import argparse
 import rospy
-from src import curvox
+import curvox
 
 
 def parse_args():
