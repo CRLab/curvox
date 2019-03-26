@@ -13,6 +13,7 @@ import tf
 import tf2_ros
 import tf_conversions
 import functools
+import struct
 
 
 @numba.jit
@@ -59,6 +60,41 @@ def np_to_cloud_msg(pc_np, frame_id):
     cloud_msg = sensor_msgs.point_cloud2.create_cloud_xyz32(header, pc_np)
 
     return cloud_msg
+
+
+def xyzrgb_array_to_pointcloud2(points, colors, stamp=None, frame_id=None, seq=None):
+    """
+    Create a sensor_msgs.PointCloud2 from an array
+    of points.
+    """
+    assert(points.shape[0] == colors.shape[0])
+
+    header = std_msgs.msg.Header()
+
+    if stamp:
+        header.stamp = stamp
+    if frame_id:
+        header.frame_id = frame_id
+    if seq:
+        header.seq = seq
+
+    new_colors = []
+    for r, g, b in colors:
+        new_colors.append(struct.unpack('I', struct.pack('BBBx', r, g, b))[0])
+
+    new_colors = np.array(new_colors).reshape(len(new_colors), 1)
+    xyzrgb = np.concatenate([points, new_colors], axis=1)
+
+    fields = [
+        sensor_msgs.msg.PointField('x', 0, sensor_msgs.msg.PointField.FLOAT32, 1),
+        sensor_msgs.msg.PointField('y', 4, sensor_msgs.msg.PointField.FLOAT32, 1),
+        sensor_msgs.msg.PointField('z', 8, sensor_msgs.msg.PointField.FLOAT32, 1),
+        sensor_msgs.msg.PointField('rgb', 12, sensor_msgs.msg.PointField.UINT32, 1),
+    ]
+
+    msg = sensor_msgs.point_cloud2.create_cloud(header, fields, xyzrgb)
+
+    return msg
 
 
 @numba.jit
