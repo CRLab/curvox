@@ -1,19 +1,20 @@
+import functools
+import numpy as np
 import operator
+import struct
 
 import numba
-import numpy as np
 import pcl
-
 import ros_numpy
 import rospy
 import sensor_msgs.msg
 import sensor_msgs.point_cloud2
+import geometry_msgs.msg
+import shape_msgs.msg
 import std_msgs.msg
 import tf
 import tf2_ros
 import tf_conversions
-import functools
-import struct
 
 
 @numba.jit
@@ -67,7 +68,7 @@ def xyzrgb_array_to_pointcloud2(points, colors, stamp=None, frame_id=None, seq=N
     Create a sensor_msgs.PointCloud2 from an array
     of points.
     """
-    assert(points.shape[0] == colors.shape[0])
+    assert (points.shape[0] == colors.shape[0])
 
     header = std_msgs.msg.Header()
 
@@ -97,6 +98,67 @@ def xyzrgb_array_to_pointcloud2(points, colors, stamp=None, frame_id=None, seq=N
     return msg
 
 
+def cloud_msg_to_json_dict(cloud_msg):
+    """
+
+    :param cloud_msg:
+    :type cloud_msg: sensor_msgs.msg.PointCloud2
+    :return:
+    :rtype: dict
+    """
+    data = cloud_msg.data.encode('base64')
+    msg = dict(
+        header=dict(
+            seq=cloud_msg.header.seq,
+            frame_id=cloud_msg.header.frame_id
+        ),
+        height=cloud_msg.height,
+        width=cloud_msg.width,
+        fields=[
+            dict(
+                name=field.name,
+                offset=field.offset,
+                datatype=field.datatype,
+                count=field.count
+            ) for field in cloud_msg.fields
+        ],
+        is_bigendian=cloud_msg.is_bigendian,
+        point_step=cloud_msg.point_step,
+        row_step=cloud_msg.row_step,
+        data=data,
+        is_dense=cloud_msg.is_dense
+    )
+    return msg
+
+
+def json_dict_to_mesh_msg(mesh_json_dict):
+    """
+    In [5]: msg_payload[0]["mesh"].keys()
+    Out[5]: [u'vertices', u'triangles']
+
+    In [6]: msg_payload[0]["mesh"]["vertices"][0]
+    Out[6]:
+    {u'x': -0.7574082016944885,
+     u'y': -0.7571043968200684,
+     u'z': 1.7426010370254517}
+
+    In [7]: msg_payload[0]["mesh"]["triangles"][0]
+    Out[7]: {u'vertex_indices': [2, 1, 0]}
+
+
+    :param cloud_json_dict:
+    :return:
+    """
+    mesh_msg = shape_msgs.msg.Mesh()
+    for vertex in mesh_json_dict["vertices"]:
+        mesh_msg.vertices.append(geometry_msgs.msg.Point(x=vertex["x"], y=vertex["y"], z=vertex["z"]))
+
+    for triangle in mesh_json_dict["triangles"]:
+        mesh_msg.triangles.append(shape_msgs.msg.MeshTriangle(vertex_indices=triangle["vertex_indices"]))
+
+    return mesh_msg
+
+
 @numba.jit
 def transform_cloud(pc, transform):
     """
@@ -116,7 +178,7 @@ def transform_cloud(pc, transform):
     homogenous_coords = np.ones((num_pts, 4))
     homogenous_coords[:, 0:3] = pc
 
-    #need points to be 4xn
+    # need points to be 4xn
     homogenous_coords = homogenous_coords.T
 
     out_4xn = np.dot(transform, homogenous_coords)
@@ -165,6 +227,30 @@ def capture_cloud_and_transform(pc_topic, source_frame, target_frame):
     cf2obj_tf_mat = tf_conversions.posemath.toMatrix(cf2obj_tf_msg)
 
     np_pc = pcl_pc.to_array()
+    np_pc = transform_cloud(np_pc, cf2obj_tf_mat)
+    np_pc = np_pc.astype(np.float32)
+
+    pcl_pc = pcl.PointCloud()
+    pcl_pc.from_array(np_pc)
+
+    return pcl_pc
+
+
+def transform_cloud_by_frame(pcl_pc, source_frame, target_frame):
+    '''
+    Transform the cloud between two frames
+    '''
+
+    # Transform cloud into correct frame
+    tf_msg = capture_tf_msg(source_frame, target_frame)
+
+    cf2obj_tf_msg = tf_conversions.posemath.fromTf(tf_msg)
+    cf2obj_tf_mat = tf_conversions.posemath.toMatrix(cf2obj_tf_msg)
+
+    try:
+        np_pc = pcl_pc.to_array()
+    except:
+        np_pc = pcl_pc
     np_pc = transform_cloud(np_pc, cf2obj_tf_mat)
     np_pc = np_pc.astype(np.float32)
 
