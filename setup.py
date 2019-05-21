@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name="curvox",
-      version='1.0',
+      version='1.0.0',
       description=
       """
       Python library with utilities for converting pointclouds, meshes,
