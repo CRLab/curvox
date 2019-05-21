@@ -24,7 +24,5 @@ setup(name="curvox",
                'scripts/find_pc_cluster',
                'scripts/filter_pcd',
                ],
-      include_package_data=True,
       package_dir={'': 'src'},
-      package_data={'curvox': ['bin/binvox']}
       )
