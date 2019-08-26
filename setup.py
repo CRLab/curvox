@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name="curvox",
-      version='1.0',
+      version='1.0.0',
       description=
       """
       Python library with utilities for converting pointclouds, meshes,
@@ -24,7 +24,5 @@ setup(name="curvox",
                'scripts/find_pc_cluster',
                'scripts/filter_pcd',
                ],
-      include_package_data=True,
       package_dir={'': 'src'},
-      package_data={'curvox': ['bin/binvox']}
       )
