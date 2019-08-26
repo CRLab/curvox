@@ -15,6 +15,7 @@ import std_msgs.msg
 import tf
 import tf2_ros
 import tf_conversions
+import ctypes
 
 
 @numba.jit
@@ -63,6 +64,35 @@ def np_to_cloud_msg(pc_np, frame_id):
     return cloud_msg
 
 
+_DATATYPES = {}
+_DATATYPES[sensor_msgs.msg.PointField.INT8]    = ('b', 1)
+_DATATYPES[sensor_msgs.msg.PointField.UINT8]   = ('B', 1)
+_DATATYPES[sensor_msgs.msg.PointField.INT16]   = ('h', 2)
+_DATATYPES[sensor_msgs.msg.PointField.UINT16]  = ('H', 2)
+_DATATYPES[sensor_msgs.msg.PointField.INT32]   = ('i', 4)
+_DATATYPES[sensor_msgs.msg.PointField.UINT32]  = ('I', 4)
+_DATATYPES[sensor_msgs.msg.PointField.FLOAT32] = ('f', 4)
+_DATATYPES[sensor_msgs.msg.PointField.FLOAT64] = ('d', 8)
+
+
+def _get_struct_fmt(is_bigendian, fields, field_names=None):
+    fmt = '>' if is_bigendian else '<'
+
+    offset = 0
+    for field in (f for f in sorted(fields, key=lambda f: f.offset) if field_names is None or f.name in field_names):
+        if offset < field.offset:
+            fmt += 'x' * (field.offset - offset)
+            offset = field.offset
+        if field.datatype not in _DATATYPES:
+            print('Skipping unknown PointField datatype [%d]' % field.datatype, file=sys.stderr)
+        else:
+            datatype_fmt, datatype_length = _DATATYPES[field.datatype]
+            fmt    += field.count * datatype_fmt
+            offset += field.count * datatype_length
+
+    return fmt
+
+
 def xyzrgb_array_to_pointcloud2(points, colors, stamp=None, frame_id=None, seq=None):
     """
     Create a sensor_msgs.PointCloud2 from an array
@@ -81,10 +111,13 @@ def xyzrgb_array_to_pointcloud2(points, colors, stamp=None, frame_id=None, seq=N
 
     new_colors = []
     for r, g, b in colors:
-        new_colors.append(struct.unpack('I', struct.pack('BBBx', r, g, b))[0])
+        new_colors.append(struct.unpack('I', struct.pack('BBBB', r, g, b, 0))[0])
 
-    new_colors = np.array(new_colors).reshape(len(new_colors), 1)
-    xyzrgb = np.concatenate([points, new_colors], axis=1)
+    new_colors = np.array(new_colors, dtype=np.uint32)
+    points = points.astype(np.float32)
+    x, y, z = points.T
+
+    xyzrgb = np.rec.fromarrays([x, y, z, new_colors], names='x,y,z,colors')
 
     fields = [
         sensor_msgs.msg.PointField('x', 0, sensor_msgs.msg.PointField.FLOAT32, 1),
