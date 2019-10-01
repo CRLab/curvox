@@ -4,7 +4,7 @@ import numba
 import mcubes
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def get_voxel_resolution(pc, patch_size):
     """
     This function takes in a pointcloud and returns the resolution 
@@ -42,7 +42,7 @@ def get_voxel_resolution(pc, patch_size):
     return voxel_resolution
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def get_bbox_center(pc):
     """
     This function takes an nx3 pointcloud and returns a tuple
@@ -71,7 +71,7 @@ def get_bbox_center(pc):
     return center
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def voxelize_points(points, pc_bbox_center, voxel_resolution, num_voxels_per_dim, pc_center_in_voxel_grid):
 
     """
@@ -210,7 +210,7 @@ def pc_to_binvox(points, **kwargs):
     return voxel_grid, voxel_center, voxel_resolution, center_point_in_voxel_grid
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def get_ternary_voxel_grid(binary_voxel_grid):
     """
     Takes a binary occupancy voxel grid for the surface of the object and
@@ -255,12 +255,12 @@ def get_ternary_voxel_grid(binary_voxel_grid):
     return ternary_voxel_grid
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def rescale_mesh(vertices, patch_center, voxel_resolution, pc_center_in_voxel_grid):
     return vertices * voxel_resolution - np.array(pc_center_in_voxel_grid) * voxel_resolution + np.array(patch_center)
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def create_voxel_grid_around_point_scaled(
         points,
         patch_center,
@@ -354,7 +354,7 @@ def pc_to_binvox_for_shape_completion(points,
     return vox
 
 
-@numba.jit
+@numba.jit(forceobj=True)
 def voxel_grid_jaccard_similarity(a, b):
     '''
     Returns the number of pixels of the intersection of two voxel grids divided
