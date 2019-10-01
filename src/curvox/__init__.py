@@ -8,11 +8,11 @@ from curvox import utils
 
 try:
     from curvox import cloud_transformations
-    from curvox import mesh_conversions
+    from curvox import mesh_transformations
     from curvox import simulate_tactile_collection
     __all__ = [
         'cloud_transformations',
-        'mesh_conversions',
+        'mesh_transformations.py',
         'simulate_tactile_collection',
         'binvox_conversions',
         'cloud_conversions',

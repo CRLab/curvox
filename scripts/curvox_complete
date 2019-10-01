@@ -1,7 +1,7 @@
 #!usr/bin/env python
 
 import curvox
-import curvox.mesh_conversions
+import curvox.mesh_transformations
 import argparse
 import pcl
 import numpy as np
@@ -39,7 +39,7 @@ def main():
     # Transform completion to world frame and write to file
     if args.transform_file is not None:
         cf_to_wf_transform = np.load(args.transform_file)
-        ply_data = curvox.mesh_conversions.transform_ply(ply_data, cf_to_wf_transform)
+        ply_data = curvox.mesh_transformations.transform_ply(ply_data, cf_to_wf_transform)
 
     ply_data.write(open(args.out_file, 'wb'))
 
