@@ -5,17 +5,31 @@ import struct
 
 import numba
 import pcl
-import ros_numpy
-import rospy
-import sensor_msgs.msg
-import sensor_msgs.point_cloud2
-import geometry_msgs.msg
-import shape_msgs.msg
-import std_msgs.msg
-import tf
-import tf2_ros
-import tf_conversions
 import ctypes
+
+try:
+    import ros_numpy
+    import rospy
+    import sensor_msgs.msg
+    import sensor_msgs.point_cloud2
+    import geometry_msgs.msg
+    import shape_msgs.msg
+    import std_msgs.msg
+    import tf
+    import tf2_ros
+    import tf_conversions
+
+    _DATATYPES = {}
+    _DATATYPES[sensor_msgs.msg.PointField.INT8]    = ('b', 1)
+    _DATATYPES[sensor_msgs.msg.PointField.UINT8]   = ('B', 1)
+    _DATATYPES[sensor_msgs.msg.PointField.INT16]   = ('h', 2)
+    _DATATYPES[sensor_msgs.msg.PointField.UINT16]  = ('H', 2)
+    _DATATYPES[sensor_msgs.msg.PointField.INT32]   = ('i', 4)
+    _DATATYPES[sensor_msgs.msg.PointField.UINT32]  = ('I', 4)
+    _DATATYPES[sensor_msgs.msg.PointField.FLOAT32] = ('f', 4)
+    _DATATYPES[sensor_msgs.msg.PointField.FLOAT64] = ('d', 8)
+except:
+    pass
 
 
 @numba.jit
@@ -62,17 +76,6 @@ def np_to_cloud_msg(pc_np, frame_id):
     cloud_msg = sensor_msgs.point_cloud2.create_cloud_xyz32(header, pc_np)
 
     return cloud_msg
-
-
-_DATATYPES = {}
-_DATATYPES[sensor_msgs.msg.PointField.INT8]    = ('b', 1)
-_DATATYPES[sensor_msgs.msg.PointField.UINT8]   = ('B', 1)
-_DATATYPES[sensor_msgs.msg.PointField.INT16]   = ('h', 2)
-_DATATYPES[sensor_msgs.msg.PointField.UINT16]  = ('H', 2)
-_DATATYPES[sensor_msgs.msg.PointField.INT32]   = ('i', 4)
-_DATATYPES[sensor_msgs.msg.PointField.UINT32]  = ('I', 4)
-_DATATYPES[sensor_msgs.msg.PointField.FLOAT32] = ('f', 4)
-_DATATYPES[sensor_msgs.msg.PointField.FLOAT64] = ('d', 8)
 
 
 def _get_struct_fmt(is_bigendian, fields, field_names=None):
