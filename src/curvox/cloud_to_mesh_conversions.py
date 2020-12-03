@@ -1,4 +1,4 @@
-import pcl
+import pypcd
 import plyfile
 import numpy
 import scipy.spatial
@@ -161,8 +161,8 @@ def complete_pcd_file_and_save(pcd_filename, completion_method, **kwargs):
         raise ValueError("completion_method must be a completion method defined in this module")
 
     suffix = kwargs.get("suffix", "")
-    cloud = pcl.load(pcd_filename)
-    points = cloud.to_array()
+    cloud = pypcd.Pointcloud.from_file(pcd_filename)
+    points = curvox.cloud_conversions.pcl_to_np(cloud)
 
     plydata = completion_method(points, **kwargs)
 
@@ -180,10 +180,10 @@ def complete_tactile_pcd_file_and_save(depth_pcd_filename, tactile_pcd_filename,
     :return:
     """
     suffix = kwargs.get("suffix", "")
-    depth_cloud = pcl.load(depth_pcd_filename)
-    tactile_cloud = pcl.load(tactile_pcd_filename)
-    depth_points = depth_cloud.to_array()
-    tactile_points = tactile_cloud.to_array()
+    depth_cloud = pypcd.Pointcloud.from_file(depth_pcd_filename)
+    depth_points = curvox.cloud_conversions.pcl_to_np(depth_cloud)
+    tactile_cloud = pypcd.Pointcloud.from_file(tactile_pcd_filename)
+    tactile_points = curvox.cloud_conversions.pcl_to_np(tactile_cloud)
 
     if completion_method not in TACTILE_COMPLETION_METHODS:
         raise ValueError("completion_method must be a tactile completion method defined in this module")
