@@ -4,7 +4,7 @@ import operator
 import struct
 
 import numba
-import pcl
+import pypcd
 import ctypes
 
 try:
@@ -229,7 +229,7 @@ def capture_cloud(pc_topic):
     :type pc_topic: str
     :param pc_topic: Point cloud topic
     :return: PointCloud of the captured ros topic
-    :rtype: pcl.PointCloud
+    :rtype: pypcd.PointCloud
     """
     if not rospy.core.is_initialized():
         rospy.init_node("capture_pointcloud", anonymous=True)
@@ -237,10 +237,9 @@ def capture_cloud(pc_topic):
     pointcloud_msg = rospy.wait_for_message(pc_topic, sensor_msgs.msg.PointCloud2)
     np_pc = cloud_msg_to_np(pointcloud_msg)
 
-    pcl_pc = pcl.PointCloud()
-    pcl_pc.from_array(np_pc)
+    pc = pypcd.Pointcloud.from_array(np_pc)
 
-    return pcl_pc
+    return pc
 
 
 def capture_cloud_and_transform(pc_topic, source_frame, target_frame):
@@ -252,7 +251,7 @@ def capture_cloud_and_transform(pc_topic, source_frame, target_frame):
     :param target_frame:
     :type target_frame: str
     :return:
-    :rtype: pcl.PointCloud
+    :rtype: pypcd.PointCloud
     """
     pcl_pc = capture_cloud(pc_topic)
 
@@ -266,10 +265,9 @@ def capture_cloud_and_transform(pc_topic, source_frame, target_frame):
     np_pc = transform_cloud(np_pc, cf2obj_tf_mat)
     np_pc = np_pc.astype(np.float32)
 
-    pcl_pc = pcl.PointCloud()
-    pcl_pc.from_array(np_pc)
+    pc = pypcd.Pointcloud.from_array(np_pc)
 
-    return pcl_pc
+    return pc
 
 
 def transform_cloud_by_frame(pcl_pc, source_frame, target_frame):
@@ -290,10 +288,9 @@ def transform_cloud_by_frame(pcl_pc, source_frame, target_frame):
     np_pc = transform_cloud(np_pc, cf2obj_tf_mat)
     np_pc = np_pc.astype(np.float32)
 
-    pcl_pc = pcl.PointCloud()
-    pcl_pc.from_array(np_pc)
+    pc = pypcd.Pointcloud.from_array(np_pc)
 
-    return pcl_pc
+    return pc
 
 
 def capture_tf_msg(source_frame, target_frame):

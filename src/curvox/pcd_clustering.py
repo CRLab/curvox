@@ -4,7 +4,7 @@ import random
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pcl
+import pypcd
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import DBSCAN
 

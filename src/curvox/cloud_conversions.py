@@ -1,4 +1,4 @@
-import pcl
+import pypcd
 import numpy as np
 
 
@@ -68,8 +68,8 @@ def pcd_to_np(pcd_filename):
     :rtype numpy.ndarray
     """
 
-    pcd = pcl.load(pcd_filename)
-    return pcl_to_np(pcd)
+    pc = pypcd.PointCloud.from_path(pcd_filename)
+    return pcl_to_np(pc)
 
 
 def pcl_to_np(pointcloud):
@@ -80,8 +80,11 @@ def pcl_to_np(pointcloud):
     :rtype numpy.ndarray
     """
 
-    pc_nx3 = pointcloud.to_array()
-    return pc_nx3
+    xyz = np.empty((pointcloud.points, 3), dtype=np.float)
+    xyz[:, 0] = pointcloud.pc_data['x']
+    xyz[:, 1] = pointcloud.pc_data['y']
+    xyz[:, 2] = pointcloud.pc_data['z']
+    return xyz
 
 
 def np_to_pcl(pc_np):
@@ -92,8 +95,7 @@ def np_to_pcl(pc_np):
     :rtype pcl.PointCloud
     """
 
-    print(pc_np.shape)
-    new_pcd = pcl.PointCloud(np.array(pc_np, np.float32))
+    new_pcd = pypcd.PointCloud.from_array(np.array(pc_np, dtype=np.float32))
     return new_pcd
 
 

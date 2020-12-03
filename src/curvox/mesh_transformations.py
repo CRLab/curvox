@@ -2,7 +2,7 @@ import numpy
 import plyfile
 import copy
 import numpy as np
-import pcl
+import pypcd
 
 
 def transform_ply(ply, transform):
@@ -40,10 +40,9 @@ def ply_to_pcl(ply):
 
     points = np.array([(vertex['x'], vertex['y'], vertex['z']) for vertex in ply.elements[0].data])
 
-    out_pc = pcl.PointCloud()
-    out_pc.from_array(points)
+    pc = pypcd.Pointcloud.from_array(points)
 
-    return out_pc
+    return pc
 
 
 def ply_to_np(ply):

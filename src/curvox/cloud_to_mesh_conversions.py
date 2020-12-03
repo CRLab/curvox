@@ -38,6 +38,26 @@ def binvox_to_ply(voxel_grid, **kwargs):
     return ply_data
 
 
+def binvox_to_ply(voxel_grid, **kwargs):
+    """
+
+    :param voxel_grid:
+    :type voxel_grid: numpy.Array
+    :param kwargs:
+    :return:
+    """
+    marching_cubes_resolution = kwargs.get("marching_cubes_resolution", 0.5)
+
+    patch_size = voxel_grid.shape[0]
+    vertices, faces = mcubes.marching_cubes(voxel_grid, marching_cubes_resolution)
+    vertices = vertices * voxel_resolution
+
+    ply_data = generate_ply_data(vertices, faces)
+
+    # Export to plyfile type
+    return ply_data
+
+
 # Helper functions
 
 

@@ -11,5 +11,5 @@ cython
 pycollada
 scikit-learn
 -e git://github.com/crlab/binvox-rw-py.git#egg=binvox-rw
--e git://github.com/CRLab/python-pcl.git#egg=python-pcl
 -e git://github.com/CRLab/MeshLabXML.git#egg=meshlabxml
+pypcd
